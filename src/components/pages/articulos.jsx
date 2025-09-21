@@ -1,7 +1,7 @@
-import React from "react";
+import React from "react"
 
-export const articulos = () => {
+export const Articulos = () => {
     return(
-        <div> articulos </div>
+        <div> Articulos importado</div>
     )
 }
