@@ -4,6 +4,9 @@ import { Footer } from "../components/shared/Footer";
 
 export const RootLayout = () => {
     const { pathname } = useLocation();
+
+	console.log(pathname);
+
 	return (
 		<div className='h-screen flex flex-col font-montserrat'>
 			<Navbar />
