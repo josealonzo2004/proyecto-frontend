@@ -3,7 +3,7 @@ import { Link, NavLink } from 'react-router-dom'
 import { HiOutlineSearch, HiOutlineShoppingBag,} from 'react-icons/hi'
 import { FaBarsStaggered } from 'react-icons/fa6'
 import { navbarLinks } from '../../constants/links'
-import { Logo } from './logo'
+import { Logo } from './Logo'
 
 export const Navbar = () => {
     return (
