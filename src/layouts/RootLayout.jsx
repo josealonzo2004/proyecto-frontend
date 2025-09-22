@@ -12,7 +12,7 @@ export const RootLayout = () => {
 			<Navbar />
 
 			{pathname === '/' && (
-                <header className="container mx-auto px-4 my-8">Banner</header>
+                <header className="my-8">Banner</header>
             )}
 
 			<main className='container mx-auto px-4 my-8 flex-1'>
@@ -20,7 +20,7 @@ export const RootLayout = () => {
 			</main>
 
 			{pathname === '/' && (
-                <header className="container mx-auto px-4 my-8">Newsletter</header>
+                <header className="my-8">Newsletter</header>
             )}
 			<Footer />
 		</div>
