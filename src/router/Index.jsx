@@ -13,11 +13,11 @@ export const router = createBrowserRouter(
                     },
                     {
                         path: 'Celulares',
-                        element: <div>Celulares</div>
+                        element: <div>Celulares2222</div>
                     },
                     {
                         path: 'Nosotros',
-                        element: <div>Nosotros</div>
+                        element: <div>Nosotros2222</div>
                     }
             ]
        }
