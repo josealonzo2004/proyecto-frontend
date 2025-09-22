@@ -1,17 +1,25 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { Navbar } from "../components/shared/Navbar";
 import { Footer } from "../components/shared/Footer";
 
 export const RootLayout = () => {
-    return (
-        <div className='h-screen flex flex-col'>
-            <Navbar />
+    const { pathname } = useLocation();
+	return (
+		<div className='h-screen flex flex-col font-montserrat'>
+			<Navbar />
 
-            <main className='container my-8 flex-1'>
-                <Outlet />
-            </main>
+			{pathname === '/' && (
+                <header className="container my-8">Banner</header>
+            )}
 
-            <Footer />
-        </div>
-    );
+			<main className='container my-8 flex-1'>
+				<Outlet />
+			</main>
+
+			{pathname === '/' && (
+                <header className="container my-8">Newsletter</header>
+            )}
+			<Footer />
+		</div>
+	);
 };

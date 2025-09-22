@@ -1,5 +1,6 @@
-import { createBrowserRouter } from "react-router-dom";
-import { RootLayout } from "../layouts/RootLayout";
+import { createBrowserRouter } from 'react-router-dom';
+import { RootLayout } from '../layouts/RootLayout';
+import { AboutPage, CellPhonePage, HomePage } from '../pages';
 
 export const router = createBrowserRouter(
     [
@@ -9,15 +10,15 @@ export const router = createBrowserRouter(
         children: [
                     {
                         index: true,
-                        element: <div>Inicio</div>
+                        element: <HomePage />, 
                     },
                     {
                         path: 'Celulares',
-                        element: <div>Celulares3333</div>
+                        element: <CellPhonePage />,
                     },
                     {
                         path: 'Nosotros',
-                        element: <div>Nosotros33333</div>
+                        element: <AboutPage />,
                     }
             ]
        }
