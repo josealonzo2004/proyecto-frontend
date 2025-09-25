@@ -1,3 +1,9 @@
+import { FeatureGrid } from "../components/home/FeatureGrid";
+
 export const HomePage = () => {
-    return <div>HomePage</div>;
+    return(
+        <div>
+            <FeatureGrid />
+        </div>
+    );   
 };
