@@ -8,7 +8,7 @@ export const HomePage = () => {
             <FeatureGrid />
 
             <ProductGrid
-                title='nuevos productos' 
+                title='nuevos productoz' 
                 products={[{id: 1, title: 'Producto 1'}]}
             />
 
