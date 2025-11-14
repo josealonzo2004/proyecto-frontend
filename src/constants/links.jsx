@@ -13,11 +13,6 @@ export const navbarLinks = [
 	},
 	{
 		id: 2,
-		title: 'Celulares',
-		href: '/celulares',
-	},
-	{
-		id: 3,
 		title: 'Sobre Nosotros',
 		href: '/nosotros',
 	},
@@ -39,13 +34,13 @@ export const socialLinks = [
 	{
 		id: 3,
 		title: 'Instagram',
-		href: 'https://www.instagram.com',
+		href: 'https://www.instagram.com/innova_arte.ec/',
 		icon: <FaInstagram />,
 	},
 	{
 		id: 4,
 		title: 'Tiktok',
-		href: 'https://www.tiktok.com',
+		href: 'https://www.tiktok.com/@innova_arte.ec',
 		icon: <FaTiktok />
 
 	},

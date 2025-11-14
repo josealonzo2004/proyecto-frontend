@@ -2,24 +2,32 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Navbar } from '../components/shared/Navbar';
 import { Footer } from '../components/shared/Footer';
 import { Banner } from '../components/home/Banner';
-import { Newsletter } from '../components/home/Newsletter';
 
 export const RootLayout = () => {
 	const { pathname } = useLocation();
+	const isHome = pathname === '/';
 
 	return (
-		<div className='h-screen flex flex-col font-montserrat'>
-			<Navbar />
+		<div className={`font-montserrat ${isHome ? 'h-screen overflow-hidden' : 'min-h-screen flex flex-col'}`}>
+			{!isHome && <Navbar />}
 
-			{pathname === '/' && <Banner />}
+			{isHome && (
+				<>
+					<Banner />
+					<Navbar />
+				</>
+			)}
 
-			<main className='container mx-auto px-4 my-8 flex-1'>
-				<Outlet />
-			</main>
+			{!isHome && (
+				<>
+					<main className='container mx-auto px-4 my-8 flex-1 w-full'>
+						<Outlet />
+					</main>
+					<Footer />
+				</>
+			)}
 
-			{pathname === '/' && <Newsletter />}
-
-			<Footer />
+			{isHome && <Outlet />}
 		</div>
 	);
 };

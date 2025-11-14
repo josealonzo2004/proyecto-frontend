@@ -1,0 +1,257 @@
+import { useState } from 'react';
+import { useCart } from '../context/CartContext';
+import { useOrders } from '../context/OrdersContext';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { HiArrowLeft } from 'react-icons/hi';
+import { Link } from 'react-router-dom';
+
+export const CheckoutPage = () => {
+    const { cartItems, getTotal, clearCart } = useCart();
+    const { createOrder } = useOrders();
+    const { user } = useAuth();
+    const navigate = useNavigate();
+    const [step, setStep] = useState(1);
+    const [transporte, setTransporte] = useState('');
+    const [shippingAddress, setShippingAddress] = useState({
+        calleAvenida: '',
+        barrio: '',
+        referencia: '',
+        ciudad: '',
+        provincia: ''
+    });
+    const [paymentMethod, setPaymentMethod] = useState('');
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        if (step === 1) {
+            setStep(2);
+        } else if (step === 2) {
+            setStep(3);
+        } else {
+            // Crear la orden
+            const orderData = {
+                cliente: {
+                    nombre: user?.nombre || 'Cliente',
+                    apellido: user?.apellido || '',
+                    email: user?.email || '',
+                    telefono: user?.telefono || ''
+                },
+                transporte: transporte,
+                direccion: shippingAddress,
+                productos: cartItems,
+                total: getTotal(),
+                metodoPago: paymentMethod
+            };
+
+            createOrder(orderData);
+            clearCart();
+            navigate('/perfil');
+        }
+    };
+
+    if (cartItems.length === 0) {
+        return (
+            <div className='text-center py-12'>
+                <p className='text-gray-500 text-lg mb-4'>No hay productos en el carrito</p>
+                <Link to='/productos' className='text-cyan-600 hover:underline'>
+                    Ir a productos
+                </Link>
+            </div>
+        );
+    }
+
+    return (
+        <div className='max-w-4xl mx-auto'>
+            <Link
+                to='/carrito'
+                className='flex items-center gap-2 text-gray-600 hover:text-cyan-600 mb-6'
+            >
+                <HiArrowLeft size={20} />
+                Volver al carrito
+            </Link>
+
+            <h1 className='text-3xl font-bold mb-8'>Checkout</h1>
+
+            {/* Progress indicator */}
+            <div className='flex items-center justify-center mb-8'>
+                <div className='flex items-center space-x-4'>
+                    {[1, 2, 3].map((s) => (
+                        <div key={s} className='flex items-center'>
+                            <div
+                                className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                    s <= step ? 'bg-cyan-600 text-white' : 'bg-gray-200 text-gray-600'
+                                }`}
+                            >
+                                {s}
+                            </div>
+                            {s < 3 && (
+                                <div
+                                    className={`w-16 h-1 ${s < step ? 'bg-cyan-600' : 'bg-gray-200'}`}
+                                />
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <form onSubmit={handleSubmit}>
+                {step === 1 && (
+                    <div className='bg-white rounded-lg p-6 border border-gray-200'>
+                        <h2 className='text-xl font-bold mb-4'>Dirección de envío</h2>
+                        <div className='space-y-4'>
+                            {/* Selector de Transporte */}
+                            <div>
+                                <label className='block font-semibold mb-2'>Transporte</label>
+                                <select
+                                    value={transporte}
+                                    onChange={(e) => setTransporte(e.target.value)}
+                                    className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
+                                    required
+                                >
+                                    <option value=''>Selecciona un transporte</option>
+                                    <option value='ENETSA'>ENETSA</option>
+                                    <option value='SERVIENTREGA'>SERVIENTREGA</option>
+                                    <option value='COOPERATIVA'>COOPERATIVA</option>
+                                    <option value='DELIVERY EN MANTA'>DELIVERY EN MANTA</option>
+                                </select>
+                            </div>
+
+                            {/* Calle y Avenida */}
+                            <div>
+                                <label className='block font-semibold mb-2'>Calle y Avenida</label>
+                                <input
+                                    type='text'
+                                    value={shippingAddress.calleAvenida}
+                                    onChange={(e) => setShippingAddress({...shippingAddress, calleAvenida: e.target.value})}
+                                    className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
+                                    placeholder='Ej: Av. Principal 123'
+                                    required
+                                />
+                            </div>
+
+                            {/* Nombre del Barrio */}
+                            <div>
+                                <label className='block font-semibold mb-2'>Nombre del Barrio</label>
+                                <input
+                                    type='text'
+                                    value={shippingAddress.barrio}
+                                    onChange={(e) => setShippingAddress({...shippingAddress, barrio: e.target.value})}
+                                    className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
+                                    placeholder='Ej: Los Esteros'
+                                    required
+                                />
+                            </div>
+
+                            {/* Referencia */}
+                            <div>
+                                <label className='block font-semibold mb-2'>Referencia</label>
+                                <input
+                                    type='text'
+                                    value={shippingAddress.referencia}
+                                    onChange={(e) => setShippingAddress({...shippingAddress, referencia: e.target.value})}
+                                    className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
+                                    placeholder='Ej: Frente al parque, casa azul'
+                                    required
+                                />
+                            </div>
+
+                            {/* Ciudad y Provincia */}
+                            <div className='grid grid-cols-2 gap-4'>
+                                <div>
+                                    <label className='block font-semibold mb-2'>Ciudad</label>
+                                    <input
+                                        type='text'
+                                        value={shippingAddress.ciudad}
+                                        onChange={(e) => setShippingAddress({...shippingAddress, ciudad: e.target.value})}
+                                        className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
+                                        placeholder='Ej: Manta'
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className='block font-semibold mb-2'>Provincia</label>
+                                    <input
+                                        type='text'
+                                        value={shippingAddress.provincia}
+                                        onChange={(e) => setShippingAddress({...shippingAddress, provincia: e.target.value})}
+                                        className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
+                                        placeholder='Ej: Manabí'
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {step === 2 && (
+                    <div className='bg-white rounded-lg p-6 border border-gray-200'>
+                        <h2 className='text-xl font-bold mb-4'>Método de pago</h2>
+                        <div className='space-y-2'>
+                            <label className='flex items-center p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50'>
+                                <input
+                                    type='radio'
+                                    name='payment'
+                                    value='Transferencia bancaria'
+                                    onChange={(e) => setPaymentMethod(e.target.value)}
+                                    className='mr-3'
+                                    required
+                                />
+                                Transferencia bancaria
+                            </label>
+                            <label className='flex items-center p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50'>
+                                <input
+                                    type='radio'
+                                    name='payment'
+                                    value='Depósito'
+                                    onChange={(e) => setPaymentMethod(e.target.value)}
+                                    className='mr-3'
+                                    required
+                                />
+                                Depósito
+                            </label>
+                        </div>
+                    </div>
+                )}
+
+                {step === 3 && (
+                    <div className='bg-white rounded-lg p-6 border border-gray-200'>
+                        <h2 className='text-xl font-bold mb-4'>Resumen del pedido</h2>
+                        <div className='space-y-2 mb-4'>
+                            {cartItems.map(item => (
+                                <div key={item.id} className='flex justify-between'>
+                                    <span>{item.product.nombre} x{item.quantity}</span>
+                                    <span>${(item.variant.precio * item.quantity).toLocaleString()}</span>
+                                </div>
+                            ))}
+                            <div className='border-t pt-2 flex justify-between font-bold text-lg'>
+                                <span>Total a pagar</span>
+                                <span className='text-cyan-600'>${getTotal().toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <div className='flex justify-between mt-8'>
+                    {step > 1 && (
+                        <button
+                            type='button'
+                            onClick={() => setStep(step - 1)}
+                            className='px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50'
+                        >
+                            Anterior
+                        </button>
+                    )}
+                    <button
+                        type='submit'
+                        className='ml-auto px-6 py-2 bg-cyan-600 text-white rounded-lg font-medium hover:bg-cyan-700'
+                    >
+                        {step < 3 ? 'Siguiente' : 'Confirmar pedido'}
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+};

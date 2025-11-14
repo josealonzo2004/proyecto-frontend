@@ -1,34 +1,81 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
+const images = [
+	'/images/bases_con_bordes.jpeg',
+	'/images/bases_onduladas.jpeg',
+	'/images/charliepops.jpeg',
+	'/images/hablador_genovesa.jpeg',
+	'/images/letrero_charliepops.jpeg',
+	'/images/letrero.jpeg',
+	'/images/servientrega.jpeg'
+];
+
 export const Banner = () => {
+	const [currentIndex, setCurrentIndex] = useState(0);
+
+	useEffect(() => {
+		const interval = setInterval(() => {
+			setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
+		}, 3000); // Cambiar imagen cada 3 segundos
+
+		return () => clearInterval(interval);
+	}, []);
+
 	return (
-		<div className='relative bg-gray-900 text-white'>
-			{/* IMAGEN DE FONDO */}
-			<div
-				className='absolute inset-0 bg-cover bg-center opacity-70 h-full'
-				style={{ backgroundImage: 'url(/images/banner1.png)' }}
-			/>
+		<div className='relative min-h-screen w-full'>
+			{/* Imágenes del carrusel como fondo completo */}
+			<div className='absolute inset-0'>
+				{images.map((image, index) => (
+					<div
+						key={index}
+						className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${
+							index === currentIndex ? 'opacity-100' : 'opacity-0'
+						}`}
+						style={{ backgroundImage: `url(${image})` }}
+					/>
+				))}
+			</div>
 
-			{/* OVERLAY */}
-			<div className='absolute inset-0 bg-black opacity-50' />
+			{/* Overlay oscuro para legibilidad */}
+			<div className='absolute inset-0 bg-black/30' />
 
-			{/* CONTENIDO */}
-			<div className='relative z-10 flex flex-col items-center justify-center py-20 px-4 text-center lg:py-40 lg:px-8'>
-				<h1 className='text-4xl font-bold mb-4 lg:text-6xl'>
-					Los mejores celulares del 2024
-				</h1>
+			{/* Contenido sobrepuesto */}
+			<div className='relative z-10 flex items-center justify-center min-h-screen p-8 lg:p-16'>
+				<div className='max-w-4xl w-full'>
+					{/* Imagen principal */}
+					<div className='text-center mb-8'>
+						<img 
+							src='/img/cortamos_ideas_blanco.png' 
+							alt='Cortamos ideas, creamos momentos' 
+							className='max-w-full h-auto mx-auto'
+						/>
+					</div>
 
-				<p className='text-lg mb-8 lg:text-2xl'>
-					Descubre las ofertas exclusivas y las últimas novedades en
-					celulares
-				</p>
+					{/* Botón CTA */}
+					<div className='text-center'>
+						<Link
+							to='/productos'
+							className='inline-block bg-rose-500 hover:bg-rose-600 text-white font-semibold py-4 px-10 rounded-lg shadow-xl transition duration-300 ease-in-out text-lg'
+						>
+							Ver Catálogo
+						</Link>
+					</div>
+				</div>
+			</div>
 
-				<Link
-					to='/celulares'
-					className='bg-gray-900 hover:bg-gray-950 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition duration-300 ease-in-out'
-				>
-					Ver celulares
-				</Link>
+			{/* Indicadores del carrusel */}
+			<div className='absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10 flex gap-2'>
+				{images.map((_, index) => (
+					<button
+						key={index}
+						onClick={() => setCurrentIndex(index)}
+						className={`w-2 h-2 rounded-full transition-all bg-white ${
+							index === currentIndex ? 'w-8' : 'opacity-50'
+						}`}
+						aria-label={`Imagen ${index + 1}`}
+					/>
+				))}
 			</div>
 		</div>
 	);
