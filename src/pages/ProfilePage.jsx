@@ -12,7 +12,7 @@ export const ProfilePage = () => {
     // Obtener pedidos del usuario actual
     const userOrders = useMemo(() => {
         if (!user || !orders) return [];
-        return orders.filter(order => order.cliente?.email === user.email);
+        return orders.filter(order => order.cliente?.email === user.correo);
     }, [user, orders]);
 
     // Obtener direcciones únicas de los pedidos del usuario
@@ -141,7 +141,7 @@ export const ProfilePage = () => {
                             <label className='block font-semibold mb-2'>Correo electrónico</label>
                             <input
                                 type='email'
-                                defaultValue={user?.email || ''}
+                                defaultValue={user?.correoElectronico || ''}
                                 className='w-full px-4 py-2 border border-gray-300 rounded-lg'
                             />
                         </div>

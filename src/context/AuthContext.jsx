@@ -137,69 +137,98 @@ import { authAPI } from '../services/api';
 const AuthContext = createContext();
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
-  return context;
+    const context = useContext(AuthContext);
+    if (!context) throw new Error('useAuth must be used within AuthProvider');
+    return context;
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    authAPI.getProfile()
-      .then(res => setUser(res.data))
-      .catch(() => localStorage.removeItem('token'))
-      .finally(() => setLoading(false));
-  }, []);
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            setLoading(false);
+            return;
+        }
+        authAPI.getProfile()
+            .then(res => setUser(res.data))
+            .catch(() => localStorage.removeItem('token'))
+            .finally(() => setLoading(false));
+    }, []);
 
-  const login = async (email, password) => {
-    const res = await authAPI.login({ email, password });
-    const token = res.data.access_token;
-    localStorage.setItem('token', token);
-    const profile = await authAPI.getProfile();
-    setUser(profile.data);
-    return profile.data;
-  };
+    // Mapeo de campos para login y llamada a la API
+    const login = async (email, password) => {
+        try {
+            // Mapear a lo que espera el backend
+            const payload = {
+                correoElectronico: email,
+                contrasenaFriada: password
+            };
 
-  // Mapeo de campos para registro y llamada a la API
-  const register = async (data) => {
-  // Construimos un objeto exacto como lo tenemos en el RegistroDto de backend
-  const payload = {
-    nombre: data.nombre,
-    apellido: data.apellido,
-    telefono: data.telefono,
+            // Llamada al backend
+            const res = await authAPI.login(payload);
 
-    // MAPEAMOS CAMPOS
-    correoElectronico: data.email,
-    contrasenaFriada: data.password,
+            // Ajusta esto si tu backend devuelve el token con otro nombre
+            // (por ejemplo: res.data.token o res.data.access_token)
+            const token = res.data?.access_token || res.data?.token || res.data;
 
-    // OBLIGATORIOS DEL DTO
-    usuarioCreaId: 1,   // Poner un número dummy mientras no tengas sistema de admins
-  };
+            if (!token) {
+                // Si respuesta no contiene token, tiramos error para manejar en UI
+                throw new Error('No se recibió token del servidor');
+            }
 
-  console.log("ENVIANDO REGISTRO:", payload);
+            // Guardar token y cargar perfil
+            localStorage.setItem('token', token);
 
-  return await authAPI.register(payload);
-};
+            // Obtener perfil del backend (ruta protegida)
+            const profileRes = await authAPI.getProfile();
+            setUser(profileRes.data);
+
+            return profileRes.data;
+        } catch (err) {
+            // Normalizar el error para que LoginPage pueda mostrar mensaje
+            console.error('Login error:', err);
+            // Si err.response existe, tomar mensaje del backend
+            const message = err?.response?.data?.message || err.message || 'Error al iniciar sesión';
+            throw new Error(message);
+        }
+    };
+
+    // Mapeo de campos para registro y llamada a la API
+    const register = async (data) => {
+        // Construimos un objeto exacto como lo tenemos en el RegistroDto de backend
+        const payload = {
+            nombre: data.nombre,
+            apellido: data.apellido,
+            telefono: data.telefono,
+
+            // MAPEAMOS CAMPOS
+            correoElectronico: data.email,
+            contrasenaFriada: data.password,
+
+            // OBLIGATORIOS DEL DTO
+            usuarioCreaId: 1,
+        };
+
+        console.log("ENVIANDO REGISTRO:", payload);
+
+        return await authAPI.register(payload);
+    };
 
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
-  };
+    const logout = () => {
+        localStorage.removeItem('token');
+        setUser(null);
+    };
 
-  return (
-    <AuthContext.Provider value={{
-      user, login, register, logout,
-      loading, isAuthenticated: !!user, isAdmin: user?.rol === 'administrador'
-    }}>
-      {children}
-    </AuthContext.Provider>
-  );
+    return (
+        <AuthContext.Provider value={{
+            user, login, register, logout,
+            loading, isAuthenticated: !!user, isAdmin: user?.rol === 'administrador'
+        }}>
+            {children}
+        </AuthContext.Provider>
+    );
 };
