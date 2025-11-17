@@ -50,7 +50,11 @@ export const router = createBrowserRouter(
                 },
                 {
                     path: 'perfil',
-                    element: <ProfilePage />,
+                    element: (
+                        <ProtectedRoute>
+                            <ProfilePage />
+                        </ProtectedRoute>
+                    ),
                 },
                 {
                     path: 'admin',
