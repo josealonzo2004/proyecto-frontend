@@ -2,7 +2,39 @@
 // TODO: Install axios -> npm install axios
 // TODO: Update import -> import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+import axios from "axios";
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: { "Content-Type": "application/json" },
+});
+
+// Incluir token en requests (después serviría para login)
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// ---- AUTH ----
+export const authAPI = {
+  login: (credentials) => api.post("/auth/login", credentials),
+  register: (userData) => api.post("/auth/register", userData),
+  getProfile: () => api.get("/auth/profile"),
+  logout: () => localStorage.removeItem("token"),
+};
+
+export default api;
+
+
+
+
+
+
 
 /*
 // Example with axios
@@ -89,9 +121,9 @@ export const reportsAPI = {
 };
 
 export default api;
-*/
 
-// Mock functions for development (to be replaced with actual API calls)
+
+// mock funciones de desarrollo (serán reemplazadas por llamadas reales a la API)
 export const mockAPI = {
     products: {
         getAll: async () => ({ data: [] }),
@@ -109,3 +141,4 @@ export const mockAPI = {
 };
 
 export default API_BASE_URL;
+*/
