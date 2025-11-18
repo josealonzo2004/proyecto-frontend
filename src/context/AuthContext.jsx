@@ -226,7 +226,8 @@ export const AuthProvider = ({ children }) => {
     return (
         <AuthContext.Provider value={{
             user, login, register, logout,
-            loading, isAuthenticated: !!user, isAdmin: user?.rol === 'administrador'
+            // el admin se determina por el rol, el rol vienen del backend el cual es rolId = 2
+            loading, isAuthenticated: !!user, isAdmin: user?.rolId === 2
         }}>
             {children}
         </AuthContext.Provider>
