@@ -8,6 +8,7 @@ import { CartProvider } from "./context/CartContext";
 import { ProductsProvider } from "./context/ProductsContext";
 import { OrdersProvider } from "./context/OrdersContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { UsersProvider } from "./context/UsersContext";
 
 try {
   const rootElement = document.getElementById('root');
@@ -19,6 +20,7 @@ try {
     <StrictMode>
       <ErrorBoundary>
         <AuthProvider>
+          <UsersProvider>
           <ProductsProvider>
             <OrdersProvider>
               <CartProvider>
@@ -26,6 +28,7 @@ try {
               </CartProvider>
             </OrdersProvider>
           </ProductsProvider>
+          </UsersProvider>
         </AuthProvider>
       </ErrorBoundary>
     </StrictMode>,

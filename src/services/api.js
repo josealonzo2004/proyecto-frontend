@@ -28,6 +28,15 @@ export const authAPI = {
   logout: () => localStorage.removeItem("token"),
 };
 
+//---- USERS ----
+export const usersAPI = {
+  getAll: () => api.get('/usuario'),
+  getById: (id) => api.get(`/usuario/${id}`),
+  create: (data) => api.post('/usuario', data),
+  update: (id, data) => api.put(`/usuario/${id}`, data),
+  delete: (id) => api.delete(`/usuario/${id}`),
+};
+
 export default api;
 
 
