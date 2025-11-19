@@ -54,7 +54,7 @@ export const UsersProvider = ({ children }) => {
         correoElectronico: data.correoElectronico,
         contrasenaFriada: data.contrasenaFriada,
         estadoCuenta: data.estadoCuenta ?? true,
-        rolId: data.rolId ?? 0,
+        rolId: data.rolId ?? 1,
         usuarioCreaId: currentUser?.usuarioId ?? 1,
       };
 

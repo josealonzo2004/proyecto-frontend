@@ -77,10 +77,9 @@ export const AdminDashboardPage = () => {
       correoElectronico: u.correoElectronico || '',
       telefono: u.telefono || '',
       contrasenaFriada: '',
-      rolId: u.rolId ?? 0,
+      rolId: u.rolId ?? 1,
     });
     setActiveSection('users');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleUserSubmit = async (e) => {
@@ -96,7 +95,7 @@ export const AdminDashboardPage = () => {
         await createUser(userForm);
         alert('Usuario creado');
       }
-      setUserForm({ nombre: '', apellido: '', correoElectronico: '', telefono: '', contrasenaFriada: '', rolId: 0 });
+      setUserForm({ nombre: '', apellido: '', correoElectronico: '', telefono: '', contrasenaFriada: '', rolId: 1 });
       await fetchUsers();
     } catch (err) {
       console.error(err);
@@ -252,8 +251,9 @@ export const AdminDashboardPage = () => {
                       <td className='py-2'>{u.usuarioId}</td>
                       <td className='py-2'>{u.nombre} {u.apellido}</td>
                       <td className='py-2'>{u.correoElectronico}</td>
-                      <td className='py-2'>{u.rolId === 1 ? 'ADMIN' : 'USER'}</td>
+                      <td className='py-2'>{u.rolId === 2 ? 'ADMIN' : 'USER'}</td>
                       <td className='py-2 text-right'>
+                        {/* aqui tenemos que arreglar despues con que ID se quedan los roles  */}
                         <button onClick={() => startEditUser(u)} className='px-3 py-1 mr-2 bg-blue-600 text-white rounded'>Editar</button>
                         <button onClick={() => { if (confirm('Eliminar usuario?')) deleteUser(u.usuarioId); }} className='px-3 py-1 bg-red-600 text-white rounded'>Eliminar</button>
                       </td>
@@ -297,14 +297,15 @@ export const AdminDashboardPage = () => {
               <div>
                 <label className='block text-sm font-semibold mb-1'>Rol</label>
                 <select className='w-full border rounded-lg px-3 py-2' value={userForm.rolId} onChange={e => setUserForm({ ...userForm, rolId: Number(e.target.value) })}>
-                  <option value={0}>Usuario</option>
-                  <option value={1}>Administrador</option>
+                  {/* aqui tenemos que ver despues con que ID se quedan los roles  */}
+                  <option value={1}>Usuario</option>
+                  <option value={2}>Administrador</option>
                 </select>
               </div>
 
               <div className='flex gap-2'>
                 <button type='submit' className='w-full bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700'>{editingUserId ? 'Actualizar' : 'Guardar usuario'}</button>
-                {editingUserId && <button type='button' onClick={() => { setEditingUserId(null); setUserForm({ nombre:'', apellido:'', correoElectronico:'', telefono:'', contrasenaFriada:'', rolId:0 }); }} className='px-4 py-2 border rounded-lg'>Cancelar</button>}
+                {editingUserId && <button type='button' onClick={() => { setEditingUserId(null); setUserForm({ nombre:'', apellido:'', correoElectronico:'', telefono:'', contrasenaFriada:'', rolId:1 }); }} className='px-4 py-2 border rounded-lg'>Cancelar</button>}
               </div>
             </form>
           </div>
