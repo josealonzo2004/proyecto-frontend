@@ -8,7 +8,7 @@ import { HiOutlineChartBar, HiOutlineShoppingBag, HiOutlineUsers } from 'react-i
 import { HiX } from 'react-icons/hi';
 import { ProductForm } from '../components/admin/ProductForm';
 import { OrderCard } from '../components/admin/OrderCard';
-import { useUsers } from '../context/UsersContext'; // <- ruta correcta
+import { useUsers } from '../context/UsersContext';
 
 export const AdminDashboardPage = () => {
   const { isAdmin } = useAuth();
@@ -29,7 +29,7 @@ export const AdminDashboardPage = () => {
     correoElectronico: '',
     telefono: '',
     contrasenaFriada: '',
-    rolId: 0,
+    rolId: 1,
   });
   const [editingUserId, setEditingUserId] = useState(null);
   const [search, setSearch] = useState('');
@@ -42,12 +42,16 @@ export const AdminDashboardPage = () => {
     );
   }
 
+  // Estadísticas del dashboard
+
   const pendingOrders = (orders || []).filter(o => o.estado === 'pendiente');
   const totalRevenue = (orders || []).reduce((sum, order) => sum + (order.total || 0), 0);
 
   // Filtrar usuarios "normales" (no admins).
   // Aquí se asume rolId === 2 == admin. Si en tu DB el id es otro, cámbialo.
+  //useMemo para evitar recalculos innecesarios cuando users no cambia
   const normalUsers = useMemo(() => {
+    //retorna todos los usuarios que no son admin
     return (users || []).filter(u => u.rolId !== 2);
   }, [users]);
 

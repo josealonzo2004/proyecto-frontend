@@ -20,6 +20,9 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+//conexion de la api(backend) con el frontend
+// se usa el axios para hacer las peticiones http y manejar las respuestas
+//api.post es para enviar datos al servidor
 // ---- AUTH ----
 export const authAPI = {
   login: (credentials) => api.post("/auth/login", credentials),

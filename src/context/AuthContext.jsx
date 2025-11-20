@@ -138,7 +138,7 @@ const AuthContext = createContext();
 
 export const useAuth = () => {
     const context = useContext(AuthContext);
-    if (!context) throw new Error('useAuth must be used within AuthProvider');
+    if (!context) throw new Error('useAuth tiene que ser usado dentro de AuthProvider');
     return context;
 };
 
@@ -146,12 +146,14 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    // Al montar, verificar si hay token y cargar perfil
     useEffect(() => {
         const token = localStorage.getItem('token');
         if (!token) {
             setLoading(false);
             return;
         }
+        // Si hay token, intentar cargar perfil
         authAPI.getProfile()
             .then(res => setUser(res.data))
             .catch(() => localStorage.removeItem('token'))
