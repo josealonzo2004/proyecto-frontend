@@ -1,5 +1,5 @@
 // src/pages/AdminDashboardPage.jsx
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useProducts } from '../context/ProductsContext';
 import { useOrders } from '../context/OrdersContext';
@@ -45,10 +45,18 @@ export const AdminDashboardPage = () => {
   const pendingOrders = (orders || []).filter(o => o.estado === 'pendiente');
   const totalRevenue = (orders || []).reduce((sum, order) => sum + (order.total || 0), 0);
 
+  // Filtrar usuarios "normales" (no admins).
+  // Aquí se asume rolId === 2 == admin. Si en tu DB el id es otro, cámbialo.
+  const normalUsers = useMemo(() => {
+    return (users || []).filter(u => u.rolId !== 2);
+  }, [users]);
+
   const stats = [
     { label: 'Ventas totales', value: `$${totalRevenue.toLocaleString()}`, icon: HiOutlineChartBar },
     { label: 'Pedidos pendientes', value: pendingOrders.length.toString(), icon: HiOutlineShoppingBag },
-    { label: 'Total pedidos', value: (orders || []).length.toString(), icon: HiOutlineUsers }
+    { label: 'Total pedidos', value: (orders || []).length.toString(), icon: HiOutlineShoppingBag },
+    // Nueva tarjeta para usuarios normales
+    { label: 'Usuarios', value: (normalUsers || []).length.toString(), icon: HiOutlineUsers },
   ];
 
   const handleEditProduct = (product) => {
@@ -61,7 +69,7 @@ export const AdminDashboardPage = () => {
     setEditingProduct(null);
   };
 
-  // USUARIOS: filtrado cliente-side
+  // USUARIOS: filtrado cliente-side para la pestaña Users
   const q = search.trim().toLowerCase();
   const filteredUsers = users.filter(u => {
     if (!q) return true;
@@ -150,7 +158,7 @@ export const AdminDashboardPage = () => {
                               'text-gray-600'}`}>{order.estado || 'pendiente'}</p>
                     </div>
                   </div>
-                ))}
+                ))} 
               </div>
             </div>
           )}
