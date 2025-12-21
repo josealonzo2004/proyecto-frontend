@@ -1,17 +1,44 @@
-import { useState } from 'react';
+// src/components/admin/ProductForm.jsx
+import { useState, useEffect } from 'react';
 import { useProducts } from '../../context/ProductsContext';
 
 export const ProductForm = ({ product = null, onClose }) => {
+    // Extraemos addProduct y updateProduct del contexto
     const { addProduct, updateProduct } = useProducts();
+    
+    // Estado para el archivo real que se enviará al backend
+    const [selectedFile, setSelectedFile] = useState(null);
+    
+    // Estado para la vista previa (URL o Base64 solo para mostrar en pantalla)
+    const [imagePreview, setImagePreview] = useState(null);
+
     const [formData, setFormData] = useState({
-        nombre: product?.nombre || '',
-        descripcion: product?.descripcion || '',
-        precioBase: product?.precioBase || '',
-        categoria: product?.categoria || '',
-        imagen: product?.imagen || '',
-        variantes: product?.variantes || [{ nombre: 'Default', precio: product?.precioBase || '' }]
+        nombre: '',
+        descripcion: '',
+        precio: '', // Cambiado de precioBase a precio (Backend entity)
+        stock: '',  // Agregado stock (Backend entity)
+        categoria: '', 
+        imagen: '',
+        // Nota: El manejo de variantes requiere lógica extra en backend si son una tabla aparte
+        // Por ahora lo enviaremos como JSON stringify o lo manejaremos simple
+        variantes: [] 
     });
-    const [imagePreview, setImagePreview] = useState(product?.imagen || '');
+
+    // Cargar datos si estamos editando
+    useEffect(() => {
+        if (product) {
+            setFormData({
+                nombre: product.nombre || '',
+                descripcion: product.descripcion || '',
+                precio: product.precio || '', 
+                stock: product.stock || 0,
+                categoria: product.categoria || '', // Nota: Tu entity tiene marca, no categoria, ajusta según necesites
+                imagen: product.imagen || '',
+                variantes: product.variantes || []
+            });
+            setImagePreview(product.imagen);
+        }
+    }, [product]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -24,87 +51,64 @@ export const ProductForm = ({ product = null, onClose }) => {
     const handleImageUpload = (e) => {
         const file = e.target.files[0];
         if (file) {
-            // Validar que sea una imagen
+            // 1. Validaciones básicas
             if (!file.type.startsWith('image/')) {
                 alert('Por favor selecciona un archivo de imagen');
                 return;
             }
 
-            // Validar tamaño (máximo 5MB)
-            if (file.size > 5 * 1024 * 1024) {
-                alert('La imagen es muy grande. Por favor selecciona una imagen menor a 5MB');
-                return;
-            }
+            // 2. Guardamos el archivo real para enviarlo luego
+            setSelectedFile(file);
 
-            // Convertir a base64
+            // 3. Generamos vista previa para el usuario (solo visual)
             const reader = new FileReader();
             reader.onloadend = () => {
-                const base64String = reader.result;
-                setFormData(prev => ({
-                    ...prev,
-                    imagen: base64String
-                }));
-                setImagePreview(base64String);
-            };
-            reader.onerror = () => {
-                alert('Error al leer la imagen');
+                setImagePreview(reader.result);
             };
             reader.readAsDataURL(file);
         }
     };
 
-    const handleVariantChange = (index, field, value) => {
-        const newVariants = [...formData.variantes];
-        newVariants[index] = { ...newVariants[index], [field]: value };
-        setFormData(prev => ({
-            ...prev,
-            variantes: newVariants
-        }));
-    };
-
-    const addVariant = () => {
-        setFormData(prev => ({
-            ...prev,
-            variantes: [...prev.variantes, { nombre: '', precio: '' }]
-        }));
-    };
-
-    const removeVariant = (index) => {
-        setFormData(prev => ({
-            ...prev,
-            variantes: prev.variantes.filter((_, i) => i !== index)
-        }));
-    };
-
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         
+        // Preparamos el objeto de datos
+        // Asegúrate de que los nombres coincidan con tu CreateProductoDto
         const productData = {
-            ...formData,
-            precioBase: parseFloat(formData.precioBase),
-            variantes: formData.variantes.map(v => ({
-                id: Date.now() + Math.random(),
-                nombre: v.nombre,
-                precio: parseFloat(v.precio)
-            }))
+            nombre: formData.nombre,
+            descripcion: formData.descripcion,
+            precio: parseFloat(formData.precio),
+            stock: parseInt(formData.stock) || 0,
+            categoria: formData.categoria,
+            // Agrega otros campos requeridos por tu backend (ej. marca, slug)
+            marca: 'Generica', // Valor por defecto o agrega un input
         };
 
-        if (product) {
-            updateProduct(product.id, productData);
-        } else {
-            addProduct(productData);
+        try {
+            if (product) {
+                // UPDATE: Pasamos ID, datos y el archivo (si se cambió)
+                await updateProduct(product.productoId || product.id, productData, selectedFile);
+                alert('Producto actualizado con éxito');
+            } else {
+                // CREATE: Pasamos datos y el archivo
+                await addProduct(productData, selectedFile);
+                alert('Producto creado con éxito');
+            }
+            onClose();
+        } catch (error) {
+            console.error(error);
+            alert('Error al guardar el producto');
         }
-        
-        onClose();
     };
 
     return (
-        <div className='bg-white rounded-lg p-6 border border-gray-200'>
+        <div className='bg-white rounded-lg p-6 border border-gray-200 overflow-y-auto max-h-[90vh]'>
             <h2 className='text-2xl font-bold mb-6'>
                 {product ? 'Editar Producto' : 'Agregar Nuevo Producto'}
             </h2>
 
             <form onSubmit={handleSubmit} className='space-y-4'>
+                {/* Nombre */}
                 <div>
                     <label className='block font-semibold mb-2'>Nombre del Producto</label>
                     <input
@@ -112,143 +116,80 @@ export const ProductForm = ({ product = null, onClose }) => {
                         name='nombre'
                         value={formData.nombre}
                         onChange={handleChange}
-                        className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
+                        className='w-full px-4 py-2 border border-gray-300 rounded-lg'
                         required
                     />
                 </div>
 
+                {/* Descripción */}
                 <div>
                     <label className='block font-semibold mb-2'>Descripción</label>
                     <textarea
                         name='descripcion'
                         value={formData.descripcion}
                         onChange={handleChange}
-                        rows={4}
-                        className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
+                        rows={3}
+                        className='w-full px-4 py-2 border border-gray-300 rounded-lg'
                         required
                     />
                 </div>
 
+                {/* Precios y Stock */}
                 <div className='grid grid-cols-2 gap-4'>
                     <div>
-                        <label className='block font-semibold mb-2'>Precio Base</label>
+                        <label className='block font-semibold mb-2'>Precio</label>
                         <input
                             type='number'
-                            name='precioBase'
-                            value={formData.precioBase}
+                            name='precio'
+                            value={formData.precio}
                             onChange={handleChange}
                             step='0.01'
-                            className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
+                            className='w-full px-4 py-2 border border-gray-300 rounded-lg'
                             required
                         />
                     </div>
-
                     <div>
-                        <label className='block font-semibold mb-2'>Categoría</label>
+                        <label className='block font-semibold mb-2'>Stock</label>
                         <input
-                            type='text'
-                            name='categoria'
-                            value={formData.categoria}
+                            type='number'
+                            name='stock'
+                            value={formData.stock}
                             onChange={handleChange}
-                            className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
-                            required
+                            className='w-full px-4 py-2 border border-gray-300 rounded-lg'
                         />
                     </div>
                 </div>
 
+                {/* Imagen */}
                 <div>
-                    <label className='block font-semibold mb-2'>Imagen del Producto</label>
+                    <label className='block font-semibold mb-2'>Imagen</label>
                     
-                    {/* Vista previa de la imagen */}
                     {imagePreview && (
                         <div className='mb-4'>
                             <img
                                 src={imagePreview}
                                 alt='Vista previa'
-                                className='w-48 h-48 object-cover rounded-lg border border-gray-300'
+                                className='w-32 h-32 object-cover rounded-lg border border-gray-300'
                             />
                         </div>
                     )}
 
-                    {/* Input para subir archivo */}
-                    <div className='mb-2'>
-                        <label className='block text-sm text-gray-600 mb-2'>
-                            Subir imagen desde tu PC:
-                        </label>
-                        <input
-                            type='file'
-                            accept='image/*'
-                            onChange={handleImageUpload}
-                            className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
-                        />
-                    </div>
-
-                    {/* O usar URL */}
-                    <div className='mt-4'>
-                        <label className='block text-sm text-gray-600 mb-2'>
-                            O ingresa una URL de imagen:
-                        </label>
-                        <input
-                            type='text'
-                            name='imagen'
-                            value={formData.imagen.startsWith('data:') ? '' : formData.imagen}
-                            onChange={(e) => {
-                                handleChange(e);
-                                setImagePreview(e.target.value);
-                            }}
-                            placeholder='/images/producto.jpg o https://...'
-                            className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
-                        />
-                    </div>
+                    <input
+                        type='file'
+                        accept='image/*'
+                        onChange={handleImageUpload}
+                        className='w-full'
+                    />
+                    <p className='text-xs text-gray-500 mt-1'>Deja vacío para mantener la imagen actual (al editar).</p>
                 </div>
 
-                <div>
-                    <div className='flex justify-between items-center mb-2'>
-                        <label className='block font-semibold'>Variantes</label>
-                        <button
-                            type='button'
-                            onClick={addVariant}
-                            className='text-cyan-600 hover:text-cyan-700 text-sm font-medium'
-                        >
-                            + Agregar Variante
-                        </button>
-                    </div>
-                    {formData.variantes.map((variant, index) => (
-                        <div key={index} className='flex gap-2 mb-2'>
-                            <input
-                                type='text'
-                                placeholder='Nombre variante'
-                                value={variant.nombre}
-                                onChange={(e) => handleVariantChange(index, 'nombre', e.target.value)}
-                                className='flex-1 px-4 py-2 border border-gray-300 rounded-lg'
-                            />
-                            <input
-                                type='number'
-                                placeholder='Precio'
-                                value={variant.precio}
-                                onChange={(e) => handleVariantChange(index, 'precio', e.target.value)}
-                                step='0.01'
-                                className='w-32 px-4 py-2 border border-gray-300 rounded-lg'
-                            />
-                            {formData.variantes.length > 1 && (
-                                <button
-                                    type='button'
-                                    onClick={() => removeVariant(index)}
-                                    className='px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600'
-                                >
-                                    ×
-                                </button>
-                            )}
-                        </div>
-                    ))}
-                </div>
-
+                {/* Botones */}
                 <div className='flex gap-4 pt-4'>
                     <button
                         type='submit'
                         className='flex-1 bg-cyan-600 text-white py-3 rounded-lg font-medium hover:bg-cyan-700'
                     >
-                        {product ? 'Actualizar' : 'Agregar'} Producto
+                        {product ? 'Guardar Cambios' : 'Crear Producto'}
                     </button>
                     <button
                         type='button'

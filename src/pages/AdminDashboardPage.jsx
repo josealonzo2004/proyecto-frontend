@@ -181,14 +181,14 @@ export const AdminDashboardPage = () => {
 
           <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
             {(products || []).map(product => (
-              <div key={product.id} className='bg-white rounded-lg border border-gray-200 p-4'>
+              <div key={product.productoId} className='bg-white rounded-lg border border-gray-200 p-4'>
                 {product.imagen && <img src={product.imagen} alt={product.nombre} className='w-full h-48 object-cover rounded-lg mb-3' />}
                 <h3 className='font-bold text-lg mb-2'>{product.nombre}</h3>
                 <p className='text-gray-600 text-sm mb-2 line-clamp-2'>{product.descripcion}</p>
-                <p className='text-cyan-600 font-bold mb-3'>${product.precioBase?.toLocaleString()}</p>
+                <p className='text-cyan-600 font-bold mb-3'>${Number(product.precio).toLocaleString()}</p>
                 <div className='flex gap-2'>
                   <button onClick={() => handleEditProduct(product)} className='flex-1 bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700 text-sm'>Editar</button>
-                  <button onClick={() => deleteProduct(product.id)} className='px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600'><HiX size={20} /></button>
+                  <button onClick={() => deleteProduct(product.productoId)} className='px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600'><HiX size={20} /></button>
                 </div>
               </div>
             ))}

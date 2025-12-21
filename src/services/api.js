@@ -40,6 +40,21 @@ export const usersAPI = {
   delete: (id) => api.delete(`/usuario/${id}`),
 };
 
+// ---- PRODUCTS ----
+export const productsAPI = {
+  getAll: () => api.get('/productos'),
+  getById: (id) => api.get(`/productos/${id}`),
+  // Importante: Axios detecta FormData y pone el header correcto automáticamente, 
+  // pero a veces es bueno ser explícito si hay problemas.
+  create: (formData) => api.post('/productos', formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+  }),
+  update: (id, formData) => api.put(`/productos/${id}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+  }),
+  delete: (id) => api.delete(`/productos/${id}`),
+};
+
 export default api;
 
 

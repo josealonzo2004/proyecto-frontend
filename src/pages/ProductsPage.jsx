@@ -52,7 +52,7 @@ export const ProductsPage = () => {
                     const defaultVariant = product.variantes?.[0] || { nombre: 'Default', precio: product.precioBase || 0 };
                     return (
                         <ProductCard
-                            key={product.id}
+                            key={product.productoId}
                             product={product}
                             onAddToCart={() => {
                                 if (product && defaultVariant) {
