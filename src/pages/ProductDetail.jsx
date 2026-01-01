@@ -10,26 +10,45 @@ export const ProductDetail = () => {
     const navigate = useNavigate();
     const { addToCart } = useCart();
     const { getProductById } = useProducts();
+    
+    // ESTADOS
+    const [product, setProduct] = useState(null);
+    const [loading, setLoading] = useState(true);
     const [selectedVariant, setSelectedVariant] = useState(null);
     const [quantity, setQuantity] = useState(1);
     const [customizationText, setCustomizationText] = useState('');
     const [customizationFile, setCustomizationFile] = useState(null);
 
-    const product = getProductById(id);
+    // 1. Cargar el producto correctamente desde la API
+    useEffect(() => {
+        const fetchProductData = async () => {
+            setLoading(true);
+            const data = await getProductById(id);
+            setProduct(data);
+            setLoading(false);
+        };
+        fetchProductData();
+    }, [id, getProductById]);
 
-    // Inicializar variante seleccionada solo una vez cuando se carga el producto
+    // 2. Inicializar variante seleccionada cuando el producto ya cargó
     useEffect(() => {
         if (product && !selectedVariant) {
             if (product.variantes && product.variantes.length > 0) {
                 setSelectedVariant(product.variantes[0]);
             } else {
-                // Si no hay variantes, crear una por defecto
-                setSelectedVariant({ nombre: 'Default', precio: product.precioBase || 0 });
+                setSelectedVariant({ 
+                    nombre: 'Original', 
+                    precio: Number(product.precio) || 0 
+                });
             }
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [product?.id]);
+    }, [product, selectedVariant]);
     
+    // 3. Pantallas de espera
+    if (loading) {
+        return <div className='text-center py-20'>Cargando detalles del producto...</div>;
+    }
+
     if (!product) {
         return (
             <div className='text-center py-12'>
@@ -79,7 +98,6 @@ export const ProductDetail = () => {
             nombreArchivo: customizationFile?.name || null
         };
 
-        // Agregar el producto la cantidad de veces seleccionada
         for (let i = 0; i < quantity; i++) {
             addToCart(product, selectedVariant, customization);
         }
@@ -109,12 +127,10 @@ export const ProductDetail = () => {
             nombreArchivo: customizationFile?.name || null
         };
 
-        // Agregar el producto la cantidad de veces seleccionada
         for (let i = 0; i < quantity; i++) {
             addToCart(product, selectedVariant, customization);
         }
         
-        // Redirigir al checkout
         navigate('/checkout');
     };
 
@@ -157,11 +173,15 @@ export const ProductDetail = () => {
                 </div>
 
                 {/* Información */}
-                <div>
+               <div>
                     <h1 className='text-3xl font-bold mb-4'>{product.nombre}</h1>
                     <p className='text-gray-600 mb-6'>{product.descripcion}</p>
+                    
                     <p className='text-3xl font-bold text-cyan-600 mb-6'>
-                        ${product.precioBase?.toLocaleString()}
+                        {/* SOLUCIÓN: Precio dinámico basado en la carga real */}
+                        ${selectedVariant?.precio 
+                            ? Number(selectedVariant.precio).toLocaleString('en-US', { minimumFractionDigits: 2 }) 
+                            : Number(product.precio || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
 
                     {/* Variantes */}
@@ -179,7 +199,7 @@ export const ProductDetail = () => {
                                                 : 'border-gray-300 hover:border-cyan-600'
                                         }`}
                                     >
-                                        {variant.nombre} - ${variant.precio.toLocaleString()}
+                                        {variant.nombre} - ${Number(variant.precio).toLocaleString()}
                                     </button>
                                 ))}
                             </div>

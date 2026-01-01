@@ -12,17 +12,15 @@ export const ProductForm = ({ product = null, onClose }) => {
     // Estado para la vista previa (URL o Base64 solo para mostrar en pantalla)
     const [imagePreview, setImagePreview] = useState(null);
 
-    const [formData, setFormData] = useState({
-        nombre: '',
-        descripcion: '',
-        precio: '', // Cambiado de precioBase a precio (Backend entity)
-        stock: '',  // Agregado stock (Backend entity)
-        categoria: '', 
-        imagen: '',
-        // Nota: El manejo de variantes requiere lógica extra en backend si son una tabla aparte
-        // Por ahora lo enviaremos como JSON stringify o lo manejaremos simple
-        variantes: [] 
-    });
+const [formData, setFormData] = useState({
+    nombre: product?.nombre || '',
+    descripcion: product?.descripcion || '',
+    // Cambiamos para que priorice 'precio' que viene de la DB
+    precioBase: product?.precio || '', 
+    categoria: product?.marca || '',
+    imagen: product?.imagen || '',
+    variantes: product?.variantes || [{ nombre: 'Default', precio: product?.precio || '' }]
+});
 
     // Cargar datos si estamos editando
     useEffect(() => {

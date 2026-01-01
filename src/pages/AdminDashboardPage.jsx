@@ -170,32 +170,42 @@ export const AdminDashboardPage = () => {
       )}
 
       {/* Productos */}
-      {activeSection === 'products' && (
-        <div>
-          <div className='flex justify-between items-center mb-4'>
-            <h2 className='text-xl font-bold'>Gestión de productos</h2>
-            <button onClick={() => setShowProductForm(true)} className='bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700'>+ Agregar producto</button>
-          </div>
+{activeSection === 'products' && (
+  <div>
+    <div className='flex justify-between items-center mb-4'>
+      <h2 className='text-xl font-bold'>Gestión de productos</h2>
+      <button onClick={() => setShowProductForm(true)} className='bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700'>+ Agregar producto</button>
+    </div>
 
-          {showProductForm && <div className='mb-6'><ProductForm product={editingProduct} onClose={handleCloseForm} /></div>}
+    {showProductForm && <div className='mb-6'><ProductForm product={editingProduct} onClose={handleCloseForm} /></div>}
 
-          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
-            {(products || []).map(product => (
-              <div key={product.productoId} className='bg-white rounded-lg border border-gray-200 p-4'>
-                {product.imagen && <img src={product.imagen} alt={product.nombre} className='w-full h-48 object-cover rounded-lg mb-3' />}
-                <h3 className='font-bold text-lg mb-2'>{product.nombre}</h3>
-                <p className='text-gray-600 text-sm mb-2 line-clamp-2'>{product.descripcion}</p>
-                <p className='text-cyan-600 font-bold mb-3'>${Number(product.precio).toLocaleString()}</p>
-                <div className='flex gap-2'>
-                  <button onClick={() => handleEditProduct(product)} className='flex-1 bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700 text-sm'>Editar</button>
-                  <button onClick={() => deleteProduct(product.productoId)} className='px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600'><HiX size={20} /></button>
-                </div>
-              </div>
-            ))}
-            {(!products || products.length === 0) && <div className='col-span-full text-center py-12 text-gray-500'>No hay productos. Agrega tu primer producto.</div>}
+    <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+      {(products || []).map(product => (
+        /* CAMBIO 1: Usar productoId como key */
+        <div key={product.productoId} className='bg-white rounded-lg border border-gray-200 p-4'>
+          {product.imagen && <img src={product.imagen} alt={product.nombre} className='w-full h-48 object-cover rounded-lg mb-3' />}
+          <h3 className='font-bold text-lg mb-2'>{product.nombre}</h3>
+          <p className='text-gray-600 text-sm mb-2 line-clamp-2'>{product.descripcion}</p>
+          
+          {/* CAMBIO 2: Cambiar precioBase por precio */}
+          <p className='text-cyan-600 font-bold mb-3'>
+            ${product.precio?.toLocaleString() || '0'}
+          </p>
+
+          <div className='flex gap-2'>
+            <button onClick={() => handleEditProduct(product)} className='flex-1 bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700 text-sm'>Editar</button>
+            
+            {/* CAMBIO 3: Usar productoId para eliminar */}
+            <button onClick={() => deleteProduct(product.productoId)} className='px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600'>
+              <HiX size={20} />
+            </button>
           </div>
         </div>
-      )}
+      ))}
+      {(!products || products.length === 0) && <div className='col-span-full text-center py-12 text-gray-500'>No hay productos. Agrega tu primer producto.</div>}
+    </div>
+  </div>
+)}
 
       {/* Pedidos */}
       {activeSection === 'orders' && (
