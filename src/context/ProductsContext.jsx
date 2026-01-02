@@ -109,35 +109,25 @@ export const ProductsProvider = ({ children }) => {
     const createFormData = (productData, imageFile, isUpdate = false) => {
         const formData = new FormData();
         
-        // --- CAMPOS OBLIGATORIOS COMUNES ---
         formData.append('nombre', productData.nombre);
         formData.append('marca', productData.marca || 'Generica');
         formData.append('descripcion', productData.descripcion);
-        formData.append('precio', productData.precio); // Backend espera 'precio'
+        formData.append('precio', productData.precio);
         formData.append('stock', productData.stock || 0);
-        formData.append('estadoId', 1); // Ajusta esto si manejas estados dinámicos
+        formData.append('estadoId', 1);
 
-        // --- CAMPOS OPCIONALES ---
-        formData.append('caracteristicaPrincipal', productData.caracteristicaPrincipal || 'Estándar');
+        // --- NUEVO: VARIANTES ---
+        // Si existen variantes, las enviamos como un string JSON
+        if (productData.variantes && productData.variantes.length > 0) {
+            formData.append('variantes', JSON.stringify(productData.variantes));
+        }
 
-        // --- IMAGEN ---
         if (imageFile) {
             formData.append('file', imageFile);
         }
 
-        // --- LÓGICA DIFERENCIADA CREAR vs EDITAR ---
-        if (isUpdate) {
-            // SI ES UPDATE:
-            // Solo enviamos usuarioActualizaId si tu DTO de actualización lo permite.
-            // Si tu UpdateProductoDto tiene usuarioActualizaId, descomenta la siguiente línea:
-            // formData.append('usuarioActualizaId', 1); 
-            
-            // NO enviamos usuarioCreaId ni slug (generalmente el slug no se cambia al editar)
-        } else {
-            // SI ES CREATE:
-            formData.append('usuarioCreaId', 1); // Obligatorio al crear
-
-            // Generar slug si no viene (Obligatorio al crear)
+        if (!isUpdate) {
+            formData.append('usuarioCreaId', 1);
             const slugBase = productData.slug || productData.nombre;
             const uniqueSlug = slugBase.toLowerCase().replace(/ /g, '-') + '-' + Date.now();
             formData.append('slug', uniqueSlug);
@@ -146,35 +136,24 @@ export const ProductsProvider = ({ children }) => {
         return formData;
     };
 
-    // Crear Producto
-    const addProduct = async (productData, imageFile) => {
+    // Actualiza estas funciones en ProductsContext.jsx
+    const addProduct = async (productData) => {
         try {
-            // false = modo creación
-            const formData = createFormData(productData, imageFile, false);
-            const res = await productsAPI.create(formData);
-            
-            // Agregamos el nuevo producto al estado local
+            // Enviamos el objeto JSON que ya contiene el slug
+            const res = await productsAPI.create(productData);
             setProducts([...products, res.data]);
             return res.data;
         } catch (error) {
             console.error('Error creating product:', error);
-            throw error; // Re-lanzamos para manejar la alerta en el componente
+            throw error;
         }
     };
 
-    // Actualizar Producto
-    const updateProduct = async (id, productData, imageFile) => {
+    const updateProduct = async (id, productData) => {
         try {
-            // true = modo edición
-            const formData = createFormData(productData, imageFile, true);
-            
-            // 1. Enviamos la actualización al servidor
-            await productsAPI.update(id, formData);
-            
-            // 2. CORRECCIÓN: Como el backend no nos devuelve los datos nuevos,
-            // recargamos toda la lista de productos inmediatamente.
+            // Enviamos JSON puro
+            await productsAPI.update(id, productData);
             await fetchProducts(); 
-            
         } catch (error) {
             console.error('Error updating product:', error);
             throw error;
