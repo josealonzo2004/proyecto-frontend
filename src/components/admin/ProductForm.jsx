@@ -48,11 +48,24 @@ export const ProductForm = ({ product = null, onClose }) => {
         caracteristicaPrincipal: 'Estándar',
     };
 
-    try {
+   try {
         if (product) {
-            // AL ACTUALIZAR: Quitamos usuarioCreaId y variantes
-            // Solo enviamos lo que el UpdateDTO permite
-            await updateProduct(product.productoId || product.id, basePayload);
+            // AQUÍ VA EL CÓDIGO QUE PUSASTE
+            // Esto es lo que se ejecuta cuando estás EDITANDO
+            const payloadEdicion = {
+                ...basePayload,
+                variantes: formData.variantes
+                    .filter(v => v.nombre.trim() !== '')
+                    .map(v => ({
+        // Convertimos a número para que el DTO lo acepte
+                        ...(v.varianteId && { varianteId: parseInt(v.varianteId, 10) }), 
+                        nombre: v.nombre,
+                        precio: parseFloat(v.precio)
+                    }))
+            };
+            
+            console.log("Enviando edición:", payloadEdicion);
+            await updateProduct(product.productoId || product.id, payloadEdicion);
         } else {
             // AL CREAR: Enviamos todo
             const createPayload = {
