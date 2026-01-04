@@ -33,14 +33,16 @@ export const ProductDetail = () => {
     // 2. Inicializar variante seleccionada cuando el producto ya cargó
     useEffect(() => {
         if (product && !selectedVariant) {
-            if (product.variantes && product.variantes.length > 0) {
-                setSelectedVariant(product.variantes[0]);
-            } else {
+            // Si el producto no tiene variantes, creamos una variante virtual 
+            // con el precio base para el carrito
+            if (!product.variantes || product.variantes.length === 0) {
                 setSelectedVariant({ 
                     nombre: 'Original', 
                     precio: Number(product.precio) || 0 
                 });
             }
+            // Eliminamos el bloque que hacía setSelectedVariant(product.variantes[0])
+            // para que empiece en null y muestre el precio base del producto.
         }
     }, [product, selectedVariant]);
     
@@ -76,11 +78,17 @@ export const ProductDetail = () => {
     };
 
     const handleAddToCart = async () => {
-        if (!selectedVariant) {
-            alert('Selecciona una variante');
-            return;
-        }
+    // Definimos qué variante o información de precio vamos a enviar
+    let variantToOrder = selectedVariant;
 
+    // SI NO HAY VARIANTE SELECCIONADA:
+    // Creamos un objeto temporal con los datos base del producto ($10)
+    if (!variantToOrder) {
+        variantToOrder = {
+            nombre: 'Original',
+            precio: Number(product.precio)
+        };
+    }
         let archivoBase64 = null;
         if (customizationFile) {
             try {
@@ -98,17 +106,19 @@ export const ProductDetail = () => {
             nombreArchivo: customizationFile?.name || null
         };
 
+        // Enviamos al carrito con la variante "Original" ($10) o la seleccionada ($5/$25)
         for (let i = 0; i < quantity; i++) {
-            addToCart(product, selectedVariant, customization);
+            addToCart(product, variantToOrder, customization);
         }
         alert('Producto agregado al carrito');
     };
 
     const handleBuyNow = async () => {
-        if (!selectedVariant) {
-            alert('Selecciona una variante');
-            return;
-        }
+        // CAMBIO: Si no hay variante seleccionada, usamos los datos base ($10)
+        let variantToOrder = selectedVariant || {
+            nombre: 'Original',
+            precio: Number(product.precio)
+        };
 
         let archivoBase64 = null;
         if (customizationFile) {
@@ -127,8 +137,9 @@ export const ProductDetail = () => {
             nombreArchivo: customizationFile?.name || null
         };
 
+        // Usamos variantToOrder en lugar de selectedVariant
         for (let i = 0; i < quantity; i++) {
-            addToCart(product, selectedVariant, customization);
+            addToCart(product, variantToOrder, customization);
         }
         
         navigate('/checkout');
@@ -178,11 +189,11 @@ export const ProductDetail = () => {
                     <p className='text-gray-600 mb-6'>{product.descripcion}</p>
                     
                     <p className='text-3xl font-bold text-cyan-600 mb-6'>
-                        {/* SOLUCIÓN: Precio dinámico basado en la carga real */}
-                        ${selectedVariant?.precio 
-                            ? Number(selectedVariant.precio).toLocaleString('en-US', { minimumFractionDigits: 2 }) 
-                            : Number(product.precio || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </p>
+                            $ {selectedVariant 
+                                ? Number(selectedVariant.precio).toLocaleString('en-US', { minimumFractionDigits: 2 }) 
+                                : Number(product.precio || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })
+                            }
+                        </p>
 
                     {/* Variantes */}
                     {product.variantes && product.variantes.length > 0 && (

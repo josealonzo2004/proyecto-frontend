@@ -52,17 +52,22 @@ export const ProductForm = ({ product = null, onClose }) => {
         if (product) {
             // AQUÍ VA EL CÓDIGO QUE PUSASTE
             // Esto es lo que se ejecuta cuando estás EDITANDO
-            const payloadEdicion = {
-                ...basePayload,
-                variantes: formData.variantes
-                    .filter(v => v.nombre.trim() !== '')
-                    .map(v => ({
-        // Convertimos a número para que el DTO lo acepte
-                        ...(v.varianteId && { varianteId: parseInt(v.varianteId, 10) }), 
+        const payloadEdicion = {
+            ...basePayload,
+            variantes: formData.variantes
+                .filter(v => v.nombre && v.nombre.trim() !== '')
+                .map(v => {
+                    const variantObj = {
                         nombre: v.nombre,
-                        precio: parseFloat(v.precio)
-                    }))
-            };
+                        precio: parseFloat(v.precio) || 0
+                    };
+                    // Si la variante ya tiene ID (existe en la DB), hay que enviarlo
+                    if (v.varianteId) {
+                        variantObj.varianteId = Number(v.varianteId);
+                    }
+                    return variantObj;
+                })
+        };
             
             console.log("Enviando edición:", payloadEdicion);
             await updateProduct(product.productoId || product.id, payloadEdicion);
