@@ -49,14 +49,20 @@ export const ProductsPage = () => {
             {/* Grid de productos */}
             <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
                 {filteredProducts.map(product => {
-                    const defaultVariant = product.variantes?.[0] || { nombre: 'Default', precio: product.precioBase || 0 };
+                    // CAMBIO AQUÍ: Definimos que por defecto se use el precio original del producto ($10)
+                    const baseProductAsVariant = { 
+                        nombre: 'Original', 
+                        precio: Number(product.precio) || 0 
+                    };
+
                     return (
                         <ProductCard
                             key={product.productoId}
                             product={product}
                             onAddToCart={() => {
-                                if (product && defaultVariant) {
-                                    addToCart(product, defaultVariant);
+                                // Usamos baseProductAsVariant para que siempre marque $10 desde afuera
+                                if (product) {
+                                    addToCart(product, baseProductAsVariant);
                                 }
                             }}
                         />

@@ -20,7 +20,7 @@ export const ProductCard = ({ product, onAddToCart }) => {
                 )}
             </button>
 
-            <Link to={`/productos/${product.id}`}>
+            <Link to={`/productos/${product.productoId}`}>
                 {/* Imagen del producto */}
                 <div className='aspect-square overflow-hidden rounded-lg bg-gray-100 mb-4'>
                     <img
@@ -37,7 +37,7 @@ export const ProductCard = ({ product, onAddToCart }) => {
                         {product.descripcion}
                     </p>
                     <p className='text-2xl font-bold text-cyan-600'>
-                        ${product.precioBase?.toLocaleString() || '0'}
+                        ${product.precio?.toLocaleString() || '0'}
                     </p>
                 </div>
             </Link>
