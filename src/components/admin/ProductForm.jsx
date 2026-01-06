@@ -55,13 +55,13 @@ export const ProductForm = ({ product = null, onClose }) => {
         const payloadEdicion = {
             ...basePayload,
             variantes: formData.variantes
-                .filter(v => v.nombre && v.nombre.trim() !== '')
+                .filter(v => v.nombre && v.nombre.trim() !== '') // No enviamos filas vacías
                 .map(v => {
                     const variantObj = {
                         nombre: v.nombre,
                         precio: parseFloat(v.precio) || 0
                     };
-                    // Si la variante ya tiene ID (existe en la DB), hay que enviarlo
+                    // IMPORTANTE: Enviar el ID si la variante ya existe
                     if (v.varianteId) {
                         variantObj.varianteId = Number(v.varianteId);
                     }

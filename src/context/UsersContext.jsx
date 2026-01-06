@@ -41,8 +41,11 @@ export const UsersProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    // Solo cargar usuarios si hay un usuario autenticado
+    if (currentUser) {
+      fetchUsers();
+    }
+  }, [currentUser]);
 
   // Create
   const createUser = async (data) => {
