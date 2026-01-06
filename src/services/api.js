@@ -55,6 +55,17 @@ export const productsAPI = {
   delete: (id) => api.delete(`/productos/${id}`),
 };
 
+
+// ---- DIRECCIONES (AGREGAR ESTO) ----
+export const direccionesAPI = {
+  getAll: () => api.get('/direcciones'),
+  getById: (id) => api.get(`/direcciones/${id}`),
+  create: (data) => api.post('/direcciones', data),
+  update: (id, data) => api.put(`/direcciones/${id}`, data),
+  delete: (id) => api.delete(`/direcciones/${id}`),
+};
+
+
 export default api;
 
 

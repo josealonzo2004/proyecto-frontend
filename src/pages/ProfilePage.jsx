@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useOrders } from '../context/OrdersContext';
+import { direccionesAPI } from '../api'; // 2. Importa la API
 
 export const ProfilePage = () => {
     const { user, logout } = useAuth();
@@ -9,42 +10,32 @@ export const ProfilePage = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('profile');
 
+
+    // --- NUEVO CÓDIGO A PEGAR AQUÍ ---
+    
+    // 1. Variable para guardar las direcciones que vienen de la base de datos
+    const [misDirecciones, setMisDirecciones] = useState([]);
+
+    // 2. Cada vez que cambies a la pestaña 'addresses', pedimos los datos
+    useEffect(() => {
+        if (activeTab === 'addresses') {
+            direccionesAPI.getAll()
+                .then((respuesta) => {
+                    // Guardamos los datos que nos devolvió el backend
+                    setMisDirecciones(respuesta.data);
+                })
+                .catch((error) => console.error("Error cargando direcciones", error));
+        }
+    }, [activeTab]);
+
+    // --- FIN NUEVO CÓDIGO ---
+
+
     // Obtener pedidos del usuario actual
     const userOrders = useMemo(() => {
         if (!user || !orders) return [];
         return orders.filter(order => order.cliente?.email === user.correo);
     }, [user, orders]);
-
-    // Obtener direcciones únicas de los pedidos del usuario
-    const addresses = useMemo(() => {
-        if (!userOrders || userOrders.length === 0) return [];
-        
-        const uniqueAddresses = [];
-        const seenAddresses = new Set();
-        
-        userOrders.forEach(order => {
-            if (order.direccion) {
-                // Crear una clave única para la dirección
-                const addressKey = JSON.stringify({
-                    calleAvenida: order.direccion.calleAvenida || order.direccion.calle,
-                    barrio: order.direccion.barrio,
-                    ciudad: order.direccion.ciudad,
-                    provincia: order.direccion.provincia
-                });
-                
-                if (!seenAddresses.has(addressKey)) {
-                    seenAddresses.add(addressKey);
-                    uniqueAddresses.push({
-                        id: uniqueAddresses.length + 1,
-                        ...order.direccion,
-                        transporte: order.transporte
-                    });
-                }
-            }
-        });
-        
-        return uniqueAddresses;
-    }, [userOrders]);
 
     const formatDate = (dateString) => {
         if (!dateString) return 'Fecha no disponible';
@@ -162,37 +153,34 @@ export const ProfilePage = () => {
 
             {activeTab === 'addresses' && (
                 <div className='space-y-4'>
-                    {addresses.length === 0 ? (
+                    {misDirecciones.length === 0 ? (
                         <div className='bg-white rounded-lg p-8 border border-gray-200 text-center'>
                             <p className='text-gray-500 text-lg'>No tienes direcciones guardadas</p>
-                            <p className='text-gray-400 text-sm mt-2'>
-                                Las direcciones se guardarán automáticamente cuando realices un pedido
-                            </p>
                         </div>
                     ) : (
-                        addresses.map((address, index) => (
-                            <div
-                                key={index}
-                                className='bg-white rounded-lg p-4 border border-gray-200'
-                            >
+                        // Aquí recorremos 'misDirecciones' en lugar de 'addresses'
+                        misDirecciones.map((dir) => (
+                            <div key={dir.direccionId} className='bg-white rounded-lg p-4 border border-gray-200'>
                                 <div className='mb-2'>
-                                    <p className='font-semibold'>
-                                        {address.calleAvenida || address.calle}
+                                    {/* Usamos los nombres exactos de tu Backend (direccion.entity.ts) */}
+                                    <p className='font-semibold text-lg'>
+                                        {dir.callePrincipal}
                                     </p>
-                                    {address.barrio && (
-                                        <p className='text-gray-600 text-sm'>Barrio: {address.barrio}</p>
-                                    )}
-                                    {address.referencia && (
-                                        <p className='text-gray-500 text-xs'>Ref: {address.referencia}</p>
-                                    )}
-                                    <p className='text-gray-600 text-sm'>
-                                        {address.ciudad}{address.provincia ? `, ${address.provincia}` : ''}
-                                    </p>
-                                    {address.transporte && (
-                                        <p className='text-cyan-600 text-sm mt-1'>
-                                            Transporte: {address.transporte}
+                                    
+                                    {/* Si existe la avenida, la mostramos */}
+                                    {dir.avenida && (
+                                        <p className='text-gray-600 text-sm'>
+                                            Avenida: {dir.avenida}
                                         </p>
                                     )}
+
+                                    <p className='text-gray-600 text-sm mt-1'>
+                                        {dir.ciudad} - {dir.provincia}
+                                    </p>
+                                    
+                                    <p className='text-gray-400 text-xs mt-1 uppercase'>
+                                        {dir.pais}
+                                    </p>
                                 </div>
                             </div>
                         ))
