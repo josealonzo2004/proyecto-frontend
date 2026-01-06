@@ -65,6 +65,13 @@ export const direccionesAPI = {
   delete: (id) => api.delete(`/direcciones/${id}`),
 };
 
+// ---- PEDIDOS (AGREGAR ESTO) ----
+export const pedidosAPI = {
+  getAll: () => api.get('/pedidos'),
+  getById: (id) => api.get(`/pedidos/${id}`),
+  create: (data) => api.post('/pedidos', data),
+};
+
 
 export default api;
 

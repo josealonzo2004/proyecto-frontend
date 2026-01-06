@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useOrders } from '../context/OrdersContext';
-import { direccionesAPI } from '../api'; // 2. Importa la API
+import { direccionesAPI, pedidosAPI } from '../api'; // 2. Importa la API
 
 export const ProfilePage = () => {
     const { user, logout } = useAuth();
@@ -11,7 +11,7 @@ export const ProfilePage = () => {
     const [activeTab, setActiveTab] = useState('profile');
 
 
-    // --- NUEVO CÓDIGO A PEGAR AQUÍ ---
+    // --- NUEVO CÓDIGO DE DIRECCIONES ---
     
     // 1. Variable para guardar las direcciones que vienen de la base de datos
     const [misDirecciones, setMisDirecciones] = useState([]);
@@ -28,7 +28,28 @@ export const ProfilePage = () => {
         }
     }, [activeTab]);
 
-    // --- FIN NUEVO CÓDIGO ---
+    // --- FIN NUEVO CÓDIGO DE DIRECCIONES ---
+
+    // --- NUEVO CÓDIGO PARA PEDIDOS ---
+    const [misPedidos, setMisPedidos] = useState([]);
+
+    useEffect(() => {
+        if (activeTab === 'orders' && user) {
+            pedidosAPI.getAll()
+                .then((res) => {
+                    // FILTRO IMPORTANTE: 
+                    // Como el backend trae TODOS los pedidos de TODOS los usuarios,
+                    // aquí filtramos solo los que pertenecen al usuario logueado.
+                    // Asumimos que user.id o user.usuarioId coinciden.
+                    const pedidosMios = res.data.filter(
+                        pedido => pedido.usuario && pedido.usuario.correoElectronico === user.correoElectronico
+                    );
+                    setMisPedidos(pedidosMios);
+                })
+                .catch(err => console.error("Error cargando pedidos", err));
+        }
+    }, [activeTab, user]);
+    // --- FIN NUEVO CÓDIGO DE PEDIDOS ---
 
 
     // Obtener pedidos del usuario actual
@@ -190,67 +211,52 @@ export const ProfilePage = () => {
 
             {activeTab === 'orders' && (
                 <div className='space-y-4'>
-                    {userOrders.length === 0 ? (
+                    {misPedidos.length === 0 ? (
                         <div className='bg-white rounded-lg p-8 border border-gray-200 text-center'>
                             <p className='text-gray-500 text-lg'>No has realizado ningún pedido aún</p>
-                            <p className='text-gray-400 text-sm mt-2'>
-                                Tus pedidos aparecerán aquí una vez que realices una compra
-                            </p>
                         </div>
                     ) : (
-                        userOrders.map(order => (
-                            <div key={order.id} className='bg-white rounded-lg p-6 border border-gray-200'>
+                        misPedidos.map(pedido => (
+                            <div key={pedido.pedidoId} className='bg-white rounded-lg p-6 border border-gray-200'>
+                                {/* Encabezado del pedido */}
                                 <div className='flex justify-between items-center mb-4'>
                                     <div>
-                                        <p className='font-semibold'>Pedido #{order.id}</p>
-                                        {order.fecha && (
-                                            <p className='text-sm text-gray-600'>
-                                                Fecha: {formatDate(order.fecha)}
-                                            </p>
-                                        )}
-                                    </div>
-                                    {order.estado && (
-                                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(order.estado)}`}>
-                                            {order.estado.toUpperCase()}
-                                        </span>
-                                    )}
-                                </div>
-                                {order.direccion && (
-                                    <div className='mb-3 text-sm text-gray-600'>
-                                        <p>
-                                            {order.direccion.calleAvenida || order.direccion.calle}
-                                            {order.direccion.barrio && `, ${order.direccion.barrio}`}
-                                            {order.direccion.ciudad && `, ${order.direccion.ciudad}`}
+                                        <p className='font-bold text-lg'>Pedido #{pedido.pedidoId}</p>
+                                        <p className='text-sm text-gray-600'>
+                                            Fecha: {new Date(pedido.fechaCreacion).toLocaleDateString()}
                                         </p>
-                                        {order.transporte && (
-                                            <p className='text-cyan-600'>Transporte: {order.transporte}</p>
-                                        )}
                                     </div>
-                                )}
-                                <div className='flex justify-between items-center'>
-                                    <p className='text-gray-600 font-semibold'>
-                                        Total: ${(order.total || 0).toLocaleString()}
+                                    {/* Estado (Si tienes una entidad Estado con descripción) */}
+                                    <span className='px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800'>
+                                        {pedido.estado ? pedido.estado.descripcion : 'Procesando'}
+                                    </span>
+                                </div>
+
+                                {/* Total */}
+                                <div className='flex justify-between items-center mb-4 border-b pb-4'>
+                                    <p className='text-gray-600 font-semibold'>Total Pagado:</p>
+                                    <p className='text-xl font-bold text-cyan-600'>
+                                        ${Number(pedido.contenidoTotal).toFixed(2)}
                                     </p>
-                                    {order.metodoPago && (
-                                        <p className='text-sm text-gray-500'>
-                                            Pago: {order.metodoPago}
-                                        </p>
-                                    )}
                                 </div>
-                                {order.productos && order.productos.length > 0 && (
-                                    <div className='mt-4 pt-4 border-t'>
-                                        <p className='text-sm font-semibold mb-2'>Productos:</p>
-                                        <div className='space-y-1'>
-                                            {order.productos.slice(0, 3).map((item, idx) => (
-                                                <p key={idx} className='text-sm text-gray-600'>
-                                                    • {item.product?.nombre || 'Producto'} x{item.quantity || 1}
-                                                </p>
+
+                                {/* Lista de productos dentro del pedido */}
+                                {pedido.detalles && pedido.detalles.length > 0 && (
+                                    <div className='bg-gray-50 rounded p-3'>
+                                        <p className='text-sm font-semibold mb-2 text-gray-700'>Productos:</p>
+                                        <div className='space-y-2'>
+                                            {pedido.detalles.map((detalle, idx) => (
+                                                <div key={idx} className='flex justify-between text-sm'>
+                                                    <span className='text-gray-600'>
+                                                        {/* Accedemos al nombre gracias al cambio del Paso 1 */}
+                                                        • {detalle.variante?.producto?.nombre || 'Producto'} 
+                                                        <span className='text-gray-400'> (x{detalle.cantidad})</span>
+                                                    </span>
+                                                    <span className='font-medium'>
+                                                        ${Number(detalle.precio).toFixed(2)}
+                                                    </span>
+                                                </div>
                                             ))}
-                                            {order.productos.length > 3 && (
-                                                <p className='text-sm text-gray-500'>
-                                                    y {order.productos.length - 3} más...
-                                                </p>
-                                            )}
                                         </div>
                                     </div>
                                 )}
