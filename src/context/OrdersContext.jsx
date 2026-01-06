@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { pedidosAPI } from '../api'; // IMPORTA TU API
+import { pedidosAPI } from "../services/api"; // IMPORTA TU API
 import { useAuth } from './AuthContext'; // Para saber si hay usuario logueado
 
 const OrdersContext = createContext();

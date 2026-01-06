@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useOrders } from '../context/OrdersContext';
-import { direccionesAPI, pedidosAPI } from '../api'; // 2. Importa la API
+import { direccionesAPI, pedidosAPI } from "../services/api"; // 2. Importa la API
 
 export const ProfilePage = () => {
     const { user, logout } = useAuth();
