@@ -32,13 +32,12 @@ export const CheckoutPage = () => {
         } else {
             // Crear la orden
             const orderData = {
-                // El backend probablemente toma el usuario del Token, 
-                // pero si lo pide explícito, envía el ID, no el objeto entero.
-                usuarioId: user?.usuarioId, 
+                usuarioId: user?.usuarioId, // <--- Verifica que esto no sea undefined
                 direccion: shippingAddress,
-                transporte: transporte, // Asegúrate de manejar esto en el backend si lo necesitas
+                transporte: transporte,
+                // Asegúrate que los nombres de propiedades aquí coincidan con el DTO
                 detalles: cartItems.map(item => ({
-                    varianteId: item.variant.varianteId || item.id, // Ajusta según tu estructura de carrito
+                    varianteId: item.variant.varianteId,
                     cantidad: item.quantity,
                     precio: item.variant.precio
                 })),
@@ -80,9 +79,8 @@ export const CheckoutPage = () => {
                     {[1, 2, 3].map((s) => (
                         <div key={s} className='flex items-center'>
                             <div
-                                className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                    s <= step ? 'bg-cyan-600 text-white' : 'bg-gray-200 text-gray-600'
-                                }`}
+                                className={`w-10 h-10 rounded-full flex items-center justify-center ${s <= step ? 'bg-cyan-600 text-white' : 'bg-gray-200 text-gray-600'
+                                    }`}
                             >
                                 {s}
                             </div>
@@ -118,13 +116,13 @@ export const CheckoutPage = () => {
                                 </select>
                             </div>
 
-                          {/* Calle Principal */}
+                            {/* Calle Principal */}
                             <div>
                                 <label className='block font-semibold mb-2'>Calle Principal</label>
                                 <input
                                     type='text'
                                     value={shippingAddress.callePrincipal}
-                                    onChange={(e) => setShippingAddress({...shippingAddress, callePrincipal: e.target.value})}
+                                    onChange={(e) => setShippingAddress({ ...shippingAddress, callePrincipal: e.target.value })}
                                     className='w-full px-4 py-2 border border-gray-300 rounded-lg'
                                     placeholder='Ej: Av. 4 de Noviembre'
                                     required
@@ -137,7 +135,7 @@ export const CheckoutPage = () => {
                                 <input
                                     type='text'
                                     value={shippingAddress.avenida}
-                                    onChange={(e) => setShippingAddress({...shippingAddress, avenida: e.target.value})}
+                                    onChange={(e) => setShippingAddress({ ...shippingAddress, avenida: e.target.value })}
                                     className='w-full px-4 py-2 border border-gray-300 rounded-lg'
                                     placeholder='Ej: Calle 113'
                                 />
@@ -150,7 +148,7 @@ export const CheckoutPage = () => {
                                     <input
                                         type='text'
                                         value={shippingAddress.ciudad}
-                                        onChange={(e) => setShippingAddress({...shippingAddress, ciudad: e.target.value})}
+                                        onChange={(e) => setShippingAddress({ ...shippingAddress, ciudad: e.target.value })}
                                         className='w-full px-4 py-2 border border-gray-300 rounded-lg'
                                         required
                                     />
@@ -160,20 +158,20 @@ export const CheckoutPage = () => {
                                     <input
                                         type='text'
                                         value={shippingAddress.provincia}
-                                        onChange={(e) => setShippingAddress({...shippingAddress, provincia: e.target.value})}
+                                        onChange={(e) => setShippingAddress({ ...shippingAddress, provincia: e.target.value })}
                                         className='w-full px-4 py-2 border border-gray-300 rounded-lg'
                                         required
                                     />
                                 </div>
                             </div>
 
-                             {/* País */}
-                             <div>
+                            {/* País */}
+                            <div>
                                 <label className='block font-semibold mb-2'>País</label>
                                 <input
                                     type='text'
                                     value={shippingAddress.pais}
-                                    onChange={(e) => setShippingAddress({...shippingAddress, pais: e.target.value})}
+                                    onChange={(e) => setShippingAddress({ ...shippingAddress, pais: e.target.value })}
                                     className='w-full px-4 py-2 border border-gray-300 rounded-lg'
                                     required
                                 />

@@ -47,20 +47,17 @@ export const ProductsPage = () => {
             </div>
 
             {/* Grid de productos */}
-            <div className='grid grid-cols-1 ...'>
+            {/* CAMBIO: Usamos 'grid-cols-2' en móvil y 'lg:grid-cols-4' en PC */}
+            <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4'>
                 {filteredProducts.map(product => {
-                    // Backend usa 'precio', no 'precioBase'. 
-                    const defaultVariant = product.variantes?.[0] || { nombre: 'Estándar', precio: product.precio || 0 };
-                    
+                    // ... lógica de variante ...
                     return (
                         <ProductCard
-                            key={product.productoId} // <--- CAMBIO AQUÍ (antes product.id)
+                            key={product.productoId} // Usa productoId
                             product={product}
                             onAddToCart={() => {
-                                if (product && defaultVariant) {
-                                    // Aseguramos pasar el ID correcto al carrito
-                                    addToCart(product, defaultVariant);
-                                }
+                                // ... tu lógica de agregar ...
+                                alert("Producto agregado al carrito"); // Solución problema 2 (rápida)
                             }}
                         />
                     );

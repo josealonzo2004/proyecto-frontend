@@ -123,6 +123,13 @@ export const ProductsProvider = ({ children }) => {
              formData.append('slug', data.slug);
         }
 
+        // --- AGREGAR ESTA LÍNEA (IMPORTANTE) ---
+        // Convertimos el array de variantes a un String JSON para que viaje con la imagen
+        if (data.variantes && data.variantes.length > 0) {
+            formData.append('variantes', JSON.stringify(data.variantes));
+        }
+        // ---------------------------------------
+
         // Agregar archivo si existe
         if (file) {
             formData.append('file', file);
