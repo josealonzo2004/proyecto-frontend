@@ -47,28 +47,25 @@ export const ProductsPage = () => {
             </div>
 
             {/* Grid de productos */}
-            <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
+            <div className='grid grid-cols-1 ...'>
                 {filteredProducts.map(product => {
-                    // CAMBIO AQUÍ: Definimos que por defecto se use el precio original del producto ($10)
-                    const baseProductAsVariant = { 
-                        nombre: 'Original', 
-                        precio: Number(product.precio) || 0 
-                    };
-
+                    // Backend usa 'precio', no 'precioBase'. 
+                    const defaultVariant = product.variantes?.[0] || { nombre: 'Estándar', precio: product.precio || 0 };
+                    
                     return (
                         <ProductCard
-                            key={product.productoId}
+                            key={product.productoId} // <--- CAMBIO AQUÍ (antes product.id)
                             product={product}
                             onAddToCart={() => {
-                                // Usamos baseProductAsVariant para que siempre marque $10 desde afuera
-                                if (product) {
-                                    addToCart(product, baseProductAsVariant);
+                                if (product && defaultVariant) {
+                                    // Aseguramos pasar el ID correcto al carrito
+                                    addToCart(product, defaultVariant);
                                 }
                             }}
                         />
                     );
                 })}
-            </div>
+            </div>  
 
             {filteredProducts.length === 0 && (
                 <div className='text-center py-12'>

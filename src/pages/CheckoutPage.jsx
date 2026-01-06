@@ -14,11 +14,11 @@ export const CheckoutPage = () => {
     const [step, setStep] = useState(1);
     const [transporte, setTransporte] = useState('');
     const [shippingAddress, setShippingAddress] = useState({
-        calleAvenida: '',
-        barrio: '',
-        referencia: '',
+        callePrincipal: '',
+        avenida: '',
         ciudad: '',
-        provincia: ''
+        provincia: '',
+        pais: 'Ecuador' // Valor por defecto
     });
     const [paymentMethod, setPaymentMethod] = useState('');
 
@@ -32,20 +32,20 @@ export const CheckoutPage = () => {
         } else {
             // Crear la orden
             const orderData = {
-                cliente: {
-                    nombre: user?.nombre || 'Cliente',
-                    apellido: user?.apellido || '',
-                    email: user?.email || '',
-                    telefono: user?.telefono || ''
-                },
-                transporte: transporte,
+                // El backend probablemente toma el usuario del Token, 
+                // pero si lo pide explícito, envía el ID, no el objeto entero.
+                usuarioId: user?.usuarioId, 
                 direccion: shippingAddress,
-                productos: cartItems,
-                total: getTotal(),
+                transporte: transporte, // Asegúrate de manejar esto en el backend si lo necesitas
+                detalles: cartItems.map(item => ({
+                    varianteId: item.variant.varianteId || item.id, // Ajusta según tu estructura de carrito
+                    cantidad: item.quantity,
+                    precio: item.variant.precio
+                })),
+                contenidoTotal: getTotal(),
                 metodoPago: paymentMethod
             };
-
-            createOrder(orderData);
+            await createOrder(orderData); // Añadí await por seguridad
             clearCart();
             navigate('/perfil');
         }
@@ -118,42 +118,28 @@ export const CheckoutPage = () => {
                                 </select>
                             </div>
 
-                            {/* Calle y Avenida */}
+                          {/* Calle Principal */}
                             <div>
-                                <label className='block font-semibold mb-2'>Calle y Avenida</label>
+                                <label className='block font-semibold mb-2'>Calle Principal</label>
                                 <input
                                     type='text'
-                                    value={shippingAddress.calleAvenida}
-                                    onChange={(e) => setShippingAddress({...shippingAddress, calleAvenida: e.target.value})}
-                                    className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
-                                    placeholder='Ej: Av. Principal 123'
+                                    value={shippingAddress.callePrincipal}
+                                    onChange={(e) => setShippingAddress({...shippingAddress, callePrincipal: e.target.value})}
+                                    className='w-full px-4 py-2 border border-gray-300 rounded-lg'
+                                    placeholder='Ej: Av. 4 de Noviembre'
                                     required
                                 />
                             </div>
 
-                            {/* Nombre del Barrio */}
+                            {/* Avenida (Opcional en tu entity nullable: true) */}
                             <div>
-                                <label className='block font-semibold mb-2'>Nombre del Barrio</label>
+                                <label className='block font-semibold mb-2'>Avenida / Intersección</label>
                                 <input
                                     type='text'
-                                    value={shippingAddress.barrio}
-                                    onChange={(e) => setShippingAddress({...shippingAddress, barrio: e.target.value})}
-                                    className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
-                                    placeholder='Ej: Los Esteros'
-                                    required
-                                />
-                            </div>
-
-                            {/* Referencia */}
-                            <div>
-                                <label className='block font-semibold mb-2'>Referencia</label>
-                                <input
-                                    type='text'
-                                    value={shippingAddress.referencia}
-                                    onChange={(e) => setShippingAddress({...shippingAddress, referencia: e.target.value})}
-                                    className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
-                                    placeholder='Ej: Frente al parque, casa azul'
-                                    required
+                                    value={shippingAddress.avenida}
+                                    onChange={(e) => setShippingAddress({...shippingAddress, avenida: e.target.value})}
+                                    className='w-full px-4 py-2 border border-gray-300 rounded-lg'
+                                    placeholder='Ej: Calle 113'
                                 />
                             </div>
 
@@ -165,8 +151,7 @@ export const CheckoutPage = () => {
                                         type='text'
                                         value={shippingAddress.ciudad}
                                         onChange={(e) => setShippingAddress({...shippingAddress, ciudad: e.target.value})}
-                                        className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
-                                        placeholder='Ej: Manta'
+                                        className='w-full px-4 py-2 border border-gray-300 rounded-lg'
                                         required
                                     />
                                 </div>
@@ -176,11 +161,22 @@ export const CheckoutPage = () => {
                                         type='text'
                                         value={shippingAddress.provincia}
                                         onChange={(e) => setShippingAddress({...shippingAddress, provincia: e.target.value})}
-                                        className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-600'
-                                        placeholder='Ej: Manabí'
+                                        className='w-full px-4 py-2 border border-gray-300 rounded-lg'
                                         required
                                     />
                                 </div>
+                            </div>
+
+                             {/* País */}
+                             <div>
+                                <label className='block font-semibold mb-2'>País</label>
+                                <input
+                                    type='text'
+                                    value={shippingAddress.pais}
+                                    onChange={(e) => setShippingAddress({...shippingAddress, pais: e.target.value})}
+                                    className='w-full px-4 py-2 border border-gray-300 rounded-lg'
+                                    required
+                                />
                             </div>
                         </div>
                     </div>

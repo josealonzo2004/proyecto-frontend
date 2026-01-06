@@ -44,8 +44,8 @@ export const AdminDashboardPage = () => {
 
   // Estadísticas del dashboard
 
-  const pendingOrders = (orders || []).filter(o => o.estado === 'pendiente');
-  const totalRevenue = (orders || []).reduce((sum, order) => sum + (order.total || 0), 0);
+  const pendingOrders = (orders || []).filter(o => o.estado?.descripcion === 'pendiente' || o.estadoId === 1); 
+  const totalRevenue = (orders || []).reduce((sum, order) => sum + (Number(order.contenidoTotal) || 0), 0);
 
   // Filtrar usuarios "normales" (no admins).
   // Aquí se asume rolId === 2 == admin. Si en tu DB el id es otro, cámbialo.
@@ -148,18 +148,18 @@ export const AdminDashboardPage = () => {
               <h2 className='text-xl font-bold mb-4'>Pedidos recientes</h2>
               <div className='space-y-3'>
                 {orders.slice(0, 3).map(order => (
-                  <div key={order.id} className='flex justify-between items-center pb-3 border-b last:border-0'>
+                  <div key={order.pedidoId} className='flex justify-between items-center pb-3 border-b last:border-0'>
                     <div>
-                      <p className='font-semibold'>Pedido #{order.id}</p>
-                      <p className='text-sm text-gray-600'>Cliente: {order.cliente?.nombre || 'N/A'} {order.cliente?.apellido || ''}</p>
+                      <p className='font-semibold'>Pedido #{order.pedidoId}</p>
+                      <p className='text-sm text-gray-600'>
+                        Cliente: {order.usuario?.nombre || 'Usuario'} {order.usuario?.apellido || ''}
+                      </p>
                     </div>
                     <div className='text-right'>
-                      <p className='font-semibold'>${(order.total || 0).toLocaleString()}</p>
-                      <p className={`text-sm ${order.estado === 'pendiente' ? 'text-yellow-600' :
-                        order.estado === 'en proceso' ? 'text-blue-600' :
-                          order.estado === 'enviado' ? 'text-purple-600' :
-                            order.estado === 'entregado' ? 'text-green-600' :
-                              'text-gray-600'}`}>{order.estado || 'pendiente'}</p>
+                      <p className='font-semibold'>${Number(order.contenidoTotal).toLocaleString()}</p>
+                      <p className='text-sm text-gray-600'>
+                          {order.estado?.descripcion || 'Procesando'}
+                      </p>
                     </div>
                   </div>
                 ))} 
@@ -207,15 +207,23 @@ export const AdminDashboardPage = () => {
   </div>
 )}
 
-      {/* Pedidos */}
-      {activeSection === 'orders' && (
-        <div>
-          <h2 className='text-xl font-bold mb-4'>Gestión de pedidos</h2>
-          <div className='space-y-4'>
-            {(!orders || orders.length === 0) ? <div className='text-center py-12 text-gray-500 bg-white rounded-lg border border-gray-200'>No hay pedidos aún</div> : (orders || []).map(order => <OrderCard key={order.id} order={order} />)}
-          </div>
-        </div>
-      )}
+      {/* Pedidos - Tab Completa */}
+            {activeSection === 'orders' && (
+              <div>
+                <h2 className='text-xl font-bold mb-4'>Gestión de pedidos</h2>
+                <div className='space-y-4'>
+                  {(!orders || orders.length === 0) ? 
+                      <div className='text-center py-12 text-gray-500 bg-white rounded-lg border border-gray-200'>No hay pedidos aún</div> 
+                      : 
+                      (orders || []).map(order => (
+                          // Aquí deberías actualizar el componente <OrderCard /> también,
+                          // pero por ahora pasamos el objeto order con las props correctas.
+                          <OrderCard key={order.pedidoId} order={order} />
+                      ))
+                  }
+                </div>
+              </div>
+            )}
 
       {/* Devoluciones */}
       {activeSection === 'returns' && (

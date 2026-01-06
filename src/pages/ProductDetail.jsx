@@ -11,8 +11,8 @@ export const ProductDetail = () => {
     const { addToCart } = useCart();
     const { getProductById } = useProducts();
     
+    const product = getProductById(id);
     // ESTADOS
-    const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
     const [selectedVariant, setSelectedVariant] = useState(null);
     const [quantity, setQuantity] = useState(1);
@@ -21,14 +21,17 @@ export const ProductDetail = () => {
 
     // 1. Cargar el producto correctamente desde la API
     useEffect(() => {
-        const fetchProductData = async () => {
-            setLoading(true);
-            const data = await getProductById(id);
-            setProduct(data);
-            setLoading(false);
-        };
-        fetchProductData();
-    }, [id, getProductById]);
+        if (product && !selectedVariant) {
+            if (product.variantes && product.variantes.length > 0) {
+                setSelectedVariant(product.variantes[0]);
+            } else {
+                // CAMBIO: usa product.precio en vez de product.precioBase
+                setSelectedVariant({ nombre: 'Estándar', precio: product.precio || 0 });
+            }
+        }
+        // CAMBIO: usa product?.productoId en vez de product?.id
+    }, [product?.productoId]); 
+
 
     // 2. Inicializar variante seleccionada cuando el producto ya cargó
     useEffect(() => {
@@ -188,12 +191,10 @@ export const ProductDetail = () => {
                     <h1 className='text-3xl font-bold mb-4'>{product.nombre}</h1>
                     <p className='text-gray-600 mb-6'>{product.descripcion}</p>
                     
+                     {/* CAMBIO: Mostrar precio correcto */}
                     <p className='text-3xl font-bold text-cyan-600 mb-6'>
-                            $ {selectedVariant 
-                                ? Number(selectedVariant.precio).toLocaleString('en-US', { minimumFractionDigits: 2 }) 
-                                : Number(product.precio || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })
-                            }
-                        </p>
+                        ${product.precio?.toLocaleString()} 
+                    </p>
 
                     {/* Variantes */}
                     {product.variantes && product.variantes.length > 0 && (

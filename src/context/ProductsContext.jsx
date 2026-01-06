@@ -73,7 +73,7 @@ export const ProductsProvider = ({ children }) => {
 
 // src/context/ProductsContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
-import { productsAPI } from '../services/api';
+import { productsAPI } from '../services/api'; // Asegúrate que la ruta sea correcta (ej: ../api)
 
 const ProductsContext = createContext();
 
@@ -87,7 +87,6 @@ export const ProductsProvider = ({ children }) => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Cargar productos al iniciar
     const fetchProducts = async () => {
         try {
             setLoading(true);
@@ -104,43 +103,48 @@ export const ProductsProvider = ({ children }) => {
         fetchProducts();
     }, []);
 
-    // Función auxiliar para construir el FormData
-    // isUpdate: controla qué IDs enviar para no romper la validación del Backend
-    const createFormData = (productData, imageFile, isUpdate = false) => {
+    // --- FUNCIÓN CLAVE: Convertir datos a FormData para enviar archivo ---
+    const prepareFormData = (data, file) => {
         const formData = new FormData();
         
-        formData.append('nombre', productData.nombre);
-        formData.append('marca', productData.marca || 'Generica');
-        formData.append('descripcion', productData.descripcion);
-        formData.append('precio', productData.precio);
-        formData.append('stock', productData.stock || 0);
-        formData.append('estadoId', 1);
-
-        // --- NUEVO: VARIANTES ---
-        // Si existen variantes, las enviamos como un string JSON
-        if (productData.variantes && productData.variantes.length > 0) {
-            formData.append('variantes', JSON.stringify(productData.variantes));
-        }
-
-        if (imageFile) {
-            formData.append('file', imageFile);
-        }
-
-        if (!isUpdate) {
-            formData.append('usuarioCreaId', 1);
-            const slugBase = productData.slug || productData.nombre;
-            const uniqueSlug = slugBase.toLowerCase().replace(/ /g, '-') + '-' + Date.now();
-            formData.append('slug', uniqueSlug);
-        }
+        // Agregar campos básicos
+        formData.append('nombre', data.nombre);
+        formData.append('descripcion', data.descripcion);
+        formData.append('precio', data.precio);
+        formData.append('stock', data.stock || 0);
+        formData.append('marca', data.marca || 'Generica');
+        formData.append('caracteristicaPrincipal', data.caracteristicaPrincipal || '');
         
+        // Agregar Slug (generar uno si no existe)
+        if (!data.slug) {
+            const uniqueSlug = (data.nombre.toLowerCase().replace(/ /g, '-') + '-' + Date.now());
+            formData.append('slug', uniqueSlug);
+        } else {
+             formData.append('slug', data.slug);
+        }
+
+        // Agregar archivo si existe
+        if (file) {
+            formData.append('file', file);
+        }
+
+        // Variantes (Si las tienes, conviértelas a string porque FormData solo acepta strings/blobs)
+        // Nota: Asegúrate que tu backend pueda recibir y parsear esto si es complejo.
+        // Si no usas variantes complejas en la creación, puedes omitir esto por ahora.
+        // formData.append('variantes', JSON.stringify(data.variantes || []));
+
         return formData;
     };
 
-    // Actualiza estas funciones en ProductsContext.jsx
-    const addProduct = async (productData) => {
+    // --- AGREGAR PRODUCTO (Modificado) ---
+    const addProduct = async (productData, imageFile) => {
         try {
-            // Enviamos el objeto JSON que ya contiene el slug
-            const res = await productsAPI.create(productData);
+            // 1. Preparamos el FormData
+            const formData = prepareFormData(productData, imageFile);
+
+            // 2. Enviamos al backend (api.js debe tener header multipart/form-data o axios lo pone solo)
+            const res = await productsAPI.create(formData);
+            
             setProducts([...products, res.data]);
             return res.data;
         } catch (error) {
@@ -149,10 +153,12 @@ export const ProductsProvider = ({ children }) => {
         }
     };
 
-    const updateProduct = async (id, productData) => {
+    // --- ACTUALIZAR PRODUCTO (Modificado) ---
+    const updateProduct = async (id, productData, imageFile) => {
         try {
-            // Enviamos JSON puro
-            await productsAPI.update(id, productData);
+            const formData = prepareFormData(productData, imageFile);
+            
+            await productsAPI.update(id, formData);
             await fetchProducts(); 
         } catch (error) {
             console.error('Error updating product:', error);
@@ -160,31 +166,20 @@ export const ProductsProvider = ({ children }) => {
         }
     };
 
-    // Eliminar Producto
     const deleteProduct = async (id) => {
         try {
-            if (!id) {
-                console.error("ID no válido para eliminar");
-                return;
-            }
+            if (!id) return;
             await productsAPI.delete(id);
-            // Filtramos usando productoId
             setProducts(products.filter(p => p.productoId !== id));
         } catch (error) {
             console.error('Error deleting product:', error);
-            alert("Error al eliminar producto");
+            alert("Error al eliminar");
         }
     };
 
-    // Obtener un producto por ID
-    const getProductById = async (id) => {
-        try {
-            const res = await productsAPI.getById(id);
-            return res.data;
-        } catch (error) {
-            console.error("Error fetching product:", error);
-            return null;
-        }
+    const getProductById = (id) => {
+        // Buscamos en el estado local primero para velocidad
+        return products.find(p => p.productoId === Number(id));
     };
 
     const value = {
