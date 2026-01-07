@@ -32,19 +32,26 @@ export const CheckoutPage = () => {
         } else {
             // Crear la orden
             const orderData = {
-                usuarioId: user?.usuarioId, // <--- Verifica que esto no sea undefined
+                usuarioId: user?.usuarioId,
                 direccion: shippingAddress,
                 transporte: transporte,
-                // Asegúrate que los nombres de propiedades aquí coincidan con el DTO
-                detalles: cartItems.map(item => ({
-                    varianteId: item.variant.varianteId,
-                    cantidad: item.quantity,
-                    precio: item.variant.precio
-                })),
+                detalles: cartItems.map(item => {
+                    const detalle = {
+                        cantidad: item.quantity,
+                        precio: item.variant.precio
+                    };
+                    // Si tiene varianteId, lo usamos; sino, usamos productoId
+                    if (item.variant.varianteId) {
+                        detalle.varianteId = item.variant.varianteId;
+                    } else if (item.variant.productoId) {
+                        detalle.productoId = item.variant.productoId;
+                    }
+                    return detalle;
+                }),
                 contenidoTotal: getTotal(),
                 metodoPago: paymentMethod
             };
-            await createOrder(orderData); // Añadí await por seguridad
+            await createOrder(orderData);
             clearCart();
             navigate('/perfil');
         }

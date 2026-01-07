@@ -147,23 +147,69 @@ export const AdminDashboardPage = () => {
             <div className='bg-white rounded-lg p-6 border border-gray-200'>
               <h2 className='text-xl font-bold mb-4'>Pedidos recientes</h2>
               <div className='space-y-3'>
-                {orders.slice(0, 3).map(order => (
-                  <div key={order.pedidoId} className='flex justify-between items-center pb-3 border-b last:border-0'>
-                    <div>
-                      <p className='font-semibold'>Pedido #{order.pedidoId}</p>
-                      <p className='text-sm text-gray-600'>
-                        Cliente: {order.usuario?.nombre || 'Usuario'} {order.usuario?.apellido || ''}
-                      </p>
-                    </div>
-                    <div className='text-right'>
-                      <p className='font-semibold'>${Number(order.contenidoTotal).toLocaleString()}</p>
-                      <p className='text-sm text-gray-600'>
-                          {order.estado?.descripcion || 'Procesando'}
-                      </p>
-                    </div>
-                  </div>
-                ))} 
+                {orders
+                  .sort((a, b) => new Date(b.fechaCreacion) - new Date(a.fechaCreacion))
+                  .slice(0, 5)
+                  .map(order => {
+                    // Función para obtener color del badge
+                    const getStatusColor = (estadoId) => {
+                      const colors = {
+                        1: 'bg-yellow-100 text-yellow-800',
+                        2: 'bg-blue-100 text-blue-800',
+                        3: 'bg-purple-100 text-purple-800',
+                        4: 'bg-green-100 text-green-800',
+                        5: 'bg-red-100 text-red-800'
+                      };
+                      return colors[estadoId] || colors[1];
+                    };
+
+                    // Función para obtener nombre del estado
+                    const getEstadoNombre = (estadoId) => {
+                      const estados = {
+                        1: 'Pendiente',
+                        2: 'En proceso',
+                        3: 'Enviado',
+                        4: 'Entregado',
+                        5: 'Cancelado'
+                      };
+                      return estados[estadoId] || 'Pendiente';
+                    };
+
+                    const estadoId = order.estado?.estadoId || order.estadoId || 1;
+
+                    return (
+                      <div key={order.pedidoId} className='flex justify-between items-center pb-3 border-b last:border-0'>
+                        <div>
+                          <p className='font-semibold'>Pedido #{order.pedidoId}</p>
+                          <p className='text-sm text-gray-600'>
+                            Cliente: {order.usuario?.nombre || 'Usuario'} {order.usuario?.apellido || ''}
+                          </p>
+                          <p className='text-xs text-gray-400'>
+                            {new Date(order.fechaCreacion).toLocaleDateString('es-ES', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                        <div className='text-right flex flex-col items-end gap-2'>
+                          <p className='font-semibold text-lg'>${Number(order.contenidoTotal).toLocaleString()}</p>
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(estadoId)}`}>
+                            {getEstadoNombre(estadoId)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })} 
               </div>
+            </div>
+          )}
+
+          {(!orders || orders.length === 0) && (
+            <div className='bg-white rounded-lg p-6 border border-gray-200 text-center text-gray-500'>
+              <p>No hay pedidos recientes</p>
             </div>
           )}
         </div>

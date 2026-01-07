@@ -27,8 +27,12 @@ export const ProductDetail = () => {
             if (product.variantes && product.variantes.length > 0) {
                 setSelectedVariant(product.variantes[0]);
             } else {
-                // Si no hay variantes, creamos una "falsa" con el precio base
-                setSelectedVariant({ nombre: 'Estándar', precio: product.precio || 0 });
+                // Si no hay variantes, creamos una con el precio del producto y el productoId
+                setSelectedVariant({ 
+                    nombre: 'Estándar', 
+                    precio: product.precio || 0,
+                    productoId: product.productoId // Guardamos el productoId para usarlo en el checkout
+                });
             }
         }
     }, [product]);

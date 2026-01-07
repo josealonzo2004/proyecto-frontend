@@ -6,21 +6,46 @@ import { HiOutlineMail } from 'react-icons/hi';
 export const OrderCard = ({ order }) => {
     const { updateOrderStatus } = useOrders();
     const [showDetails, setShowDetails] = useState(false);
+    const [selectedEstadoId, setSelectedEstadoId] = useState(order.estado?.estadoId || 1);
+    const [isUpdating, setIsUpdating] = useState(false);
 
-    // Función auxiliar para color de estado
-    const getStatusColor = (estadoObj) => {
-        // Tu backend devuelve un objeto estado o un ID.
-        // Si es objeto: estadoObj.descripcion
-        const status = estadoObj?.descripcion?.toLowerCase() || 'pendiente';
-        
-        const colors = {
-            pendiente: 'bg-yellow-100 text-yellow-800',
-            'en proceso': 'bg-blue-100 text-blue-800',
-            enviado: 'bg-purple-100 text-purple-800',
-            entregado: 'bg-green-100 text-green-800',
-            cancelado: 'bg-red-100 text-red-800'
+    // Mapeo de estadoId a nombre de estado
+    const getEstadoNombre = (estadoId) => {
+        const estados = {
+            1: 'Pendiente',
+            2: 'En proceso',
+            3: 'Enviado',
+            4: 'Entregado',
+            5: 'Cancelado'
         };
-        return colors[status] || colors.pendiente;
+        return estados[estadoId] || 'Pendiente';
+    };
+
+    // Función auxiliar para color de estado (acepta estadoId)
+    const getStatusColor = (estadoId) => {
+        const colors = {
+            1: 'bg-yellow-100 text-yellow-800',
+            2: 'bg-blue-100 text-blue-800',
+            3: 'bg-purple-100 text-purple-800',
+            4: 'bg-green-100 text-green-800',
+            5: 'bg-red-100 text-red-800'
+        };
+        return colors[estadoId] || colors[1];
+    };
+
+    // Función para guardar el estado
+    const handleSaveEstado = async () => {
+        setIsUpdating(true);
+        try {
+            await updateOrderStatus(order.pedidoId, selectedEstadoId);
+            // Mostrar notificación de éxito
+            alert('✓ Estado del pedido actualizado correctamente');
+        } catch (error) {
+            console.error('Error al actualizar estado:', error);
+            alert('✗ Error al actualizar el estado del pedido');
+        } finally {
+            setIsUpdating(false);
+        }
     };
      // Función auxiliar para formatear fecha
     const formatDate = (dateString) => {
@@ -42,8 +67,8 @@ export const OrderCard = ({ order }) => {
                         {formatDate(order.fechaCreacion)}
                     </p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(order.estado)}`}>
-                    {order.estado?.descripcion?.toUpperCase() || 'PENDIENTE'}
+                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(selectedEstadoId)}`}>
+                    {getEstadoNombre(selectedEstadoId).toUpperCase()}
                 </span>
             </div>
 
@@ -109,18 +134,38 @@ export const OrderCard = ({ order }) => {
                     </span>
                 </div>
 
-             {/* Selector de estado (Solo funcional si tienes la función conectada al backend) */}
-                <select
-                    value={order.estado?.descripcion?.toLowerCase() || 'pendiente'}
-                    onChange={(e) => updateOrderStatus(order.pedidoId, e.target.value)} // Usamos pedidoId
-                    className='px-4 py-2 border border-gray-300 rounded-lg focus:border-cyan-600 outline-none text-sm'
-                >
-                    <option value='pendiente'>Pendiente</option>
-                    <option value='en proceso'>En proceso</option>
-                    <option value='enviado'>Enviado</option>
-                    <option value='entregado'>Entregado</option>
-                    <option value='cancelado'>Cancelado</option>
-                </select>
+             {/* Selector de estado con botón de guardar */}
+                <div className='flex gap-2 items-center'>
+                    <select
+                        value={selectedEstadoId}
+                        onChange={(e) => setSelectedEstadoId(Number(e.target.value))}
+                        disabled={isUpdating}
+                        className='px-4 py-2 border border-gray-300 rounded-lg focus:border-cyan-600 outline-none text-sm disabled:bg-gray-100 disabled:cursor-not-allowed'
+                    >
+                        <option value="1">Pendiente</option>
+                        <option value="2">En proceso</option>
+                        <option value="3">Enviado</option>
+                        <option value="4">Entregado</option>
+                        <option value="5">Cancelado</option>
+                    </select>
+                    <button
+                        onClick={handleSaveEstado}
+                        disabled={isUpdating}
+                        className='px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors text-sm font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2'
+                    >
+                        {isUpdating ? (
+                            <>
+                                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Guardando...
+                            </>
+                        ) : (
+                            'Guardar'
+                        )}
+                    </button>
+                </div>
             </div>
         </div>
     );

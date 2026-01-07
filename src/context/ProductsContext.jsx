@@ -178,9 +178,12 @@ export const ProductsProvider = ({ children }) => {
             if (!id) return;
             await productsAPI.delete(id);
             setProducts(products.filter(p => p.productoId !== id));
+            alert("Producto eliminado exitosamente");
         } catch (error) {
             console.error('Error deleting product:', error);
-            alert("Error al eliminar");
+            const errorMessage = error.response?.data?.message || "Error al eliminar el producto";
+            alert(errorMessage);
+            throw error;
         }
     };
 

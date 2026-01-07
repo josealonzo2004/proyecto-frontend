@@ -58,18 +58,17 @@ export const OrdersProvider = ({ children }) => {
     };
 
     // 3. Actualizar estado (Conectado a la API)
-    const updateOrderStatus = async (id, status) => {
+    const updateOrderStatus = async (id, estadoId) => {
         try {
-            // Nota: Tu backend necesita un endpoint update que acepte { estado: ... }
-            // O debes enviar el DTO completo. Ajusta según tu 'updatePedidoDto'.
-            // Si tu backend espera un ID de estado (ej: 1, 2), debes convertir el string 'status' a ID.
-            
-            // Ejemplo simple asumiendo que el backend procesa el update:
-            await pedidosAPI.update(id, { estado: status }); 
+            // Enviar el estadoId como espera el backend
+            await pedidosAPI.update(id, { estadoId }); 
             
             await fetchOrders(); // Recargar
+            return { success: true };
         } catch (error) {
             console.error('Error actualizando estado:', error);
+            const errorMessage = error.response?.data?.message || "Error al actualizar el estado del pedido";
+            throw new Error(errorMessage);
         }
     };
 
