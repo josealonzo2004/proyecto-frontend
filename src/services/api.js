@@ -44,8 +44,7 @@ export const usersAPI = {
 export const productsAPI = {
   getAll: () => api.get('/productos'),
   getById: (id) => api.get(`/productos/${id}`),
-  // Importante: Axios detecta FormData y pone el header correcto automáticamente, 
-  // pero a veces es bueno ser explícito si hay problemas.
+  // Para crear con imagen usamos FormData, axios lo detecta solo, pero definimos headers por si acaso
   create: (formData) => api.post('/productos', formData, {
       headers: { "Content-Type": "multipart/form-data" }
   }),
@@ -54,6 +53,25 @@ export const productsAPI = {
   }),
   delete: (id) => api.delete(`/productos/${id}`),
 };
+
+// ---- DIRECCIONES (AGREGAR ESTO) ----
+export const direccionesAPI = {
+  getAll: () => api.get('/direcciones'),
+  getById: (id) => api.get(`/direcciones/${id}`),
+  create: (data) => api.post('/direcciones', data),
+  update: (id, data) => api.put(`/direcciones/${id}`, data),
+  delete: (id) => api.delete(`/direcciones/${id}`),
+};
+
+// ---- PEDIDOS (AGREGAR ESTO) ----
+export const pedidosAPI = {
+  getAll: () => api.get('/pedidos'),
+  getById: (id) => api.get(`/pedidos/${id}`),
+  create: (data) => api.post('/pedidos', data),
+  update: (id, data) => api.put(`/pedidos/${id}`, data),
+  delete: (id) => api.delete(`/pedidos/${id}`),
+};
+
 
 export default api;
 

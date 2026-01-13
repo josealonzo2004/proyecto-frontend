@@ -1,8 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useProducts } from '../../context/ProductsContext';
+import { HiOutlinePhoto } from 'react-icons/hi2'; // Opcional: Icono para que se vea bonito
 
 export const ProductForm = ({ product = null, onClose }) => {
+    // Obtenemos las funciones del contexto
     const { addProduct, updateProduct } = useProducts();
+
+    // 1. ESTADO PARA LA IMAGEN (NUEVO)
+    const [imageFile, setImageFile] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState(product?.imagen || null);
 
     const [formData, setFormData] = useState({
         nombre: product?.nombre || '',
@@ -15,11 +21,20 @@ export const ProductForm = ({ product = null, onClose }) => {
             : [{ nombre: '', precio: '' }]
     });
 
-    // Manejar cambios en los inputs de variantes
+    // Manejador para cuando seleccionan un archivo (NUEVO)
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImageFile(file);
+            // Creamos una URL temporal para ver la previsualización
+            setPreviewUrl(URL.createObjectURL(file));
+        }
+    };
+
     const handleVariantChange = (index, e) => {
         const { name, value } = e.target;
         const newVariantes = [...formData.variantes];
-        newVariantes[index][name] = name === 'precio' ? value : value;
+        newVariantes[index][name] = value;
         setFormData({ ...formData, variantes: newVariantes });
     };
 
@@ -35,64 +50,67 @@ export const ProductForm = ({ product = null, onClose }) => {
         setFormData({ ...formData, variantes: newVariantes });
     };
 
-   const handleSubmit = async (e) => {
-    e.preventDefault();
+    const handleSubmit = async (e) => {
+        e.preventDefault();
 
-    // Datos base que siempre se envían
-    const basePayload = {
-        nombre: formData.nombre,
-        descripcion: formData.descripcion,
-        precio: parseFloat(formData.precio),
-        stock: parseInt(formData.stock) || 0,
-        marca: 'Generica',
-        caracteristicaPrincipal: 'Estándar',
-    };
-
-   try {
-        if (product) {
-            // AQUÍ VA EL CÓDIGO QUE PUSASTE
-            // Esto es lo que se ejecuta cuando estás EDITANDO
-        const payloadEdicion = {
-            ...basePayload,
-            variantes: formData.variantes
-                .filter(v => v.nombre && v.nombre.trim() !== '')
-                .map(v => {
-                    const variantObj = {
-                        nombre: v.nombre,
-                        precio: parseFloat(v.precio) || 0
-                    };
-                    // Si la variante ya tiene ID (existe en la DB), hay que enviarlo
-                    if (v.varianteId) {
-                        variantObj.varianteId = Number(v.varianteId);
-                    }
-                    return variantObj;
-                })
+        // Datos base
+        const basePayload = {
+            nombre: formData.nombre,
+            descripcion: formData.descripcion,
+            precio: parseFloat(formData.precio),
+            stock: parseInt(formData.stock) || 0,
+            marca: 'Generica',
+            caracteristicaPrincipal: 'Estándar',
         };
+
+        try {
+            if (product) {
+                // --- MODO EDICIÓN ---
+                const payloadEdicion = {
+                    ...basePayload,
+                    variantes: formData.variantes
+                        .filter(v => v.nombre && v.nombre.trim() !== '')
+                        .map(v => {
+                            const variantObj = {
+                                nombre: v.nombre,
+                                precio: parseFloat(v.precio) || 0
+                            };
+                            if (v.varianteId) {
+                                variantObj.varianteId = Number(v.varianteId);
+                            }
+                            return variantObj;
+                        })
+                };
+                
+                // 3. PASAMOS EL ARCHIVO COMO SEGUNDO ARGUMENTO (NUEVO)
+                await updateProduct(product.productoId || product.id, payloadEdicion, imageFile);
+
+            } else {
+                // --- MODO CREACIÓN ---
+                const createPayload = {
+                    ...basePayload,
+                    slug: formData.nombre.toLowerCase().trim().replace(/[\s_-]+/g, '-'),
+                    usuarioCreaId: 1,
+                    estadoId: 1,
+                    variantes: formData.variantes
+                        .filter(v => v.nombre && v.nombre.trim() !== '')
+                        .map(v => ({
+                            nombre: v.nombre,
+                            precio: parseFloat(v.precio) || 0
+                        }))
+                };
+                
+                // 3. PASAMOS EL ARCHIVO COMO SEGUNDO ARGUMENTO (NUEVO)
+                await addProduct(createPayload, imageFile);
+            }
             
-            console.log("Enviando edición:", payloadEdicion);
-            await updateProduct(product.productoId || product.id, payloadEdicion);
-        } else {
-            // AL CREAR: Enviamos todo
-            const createPayload = {
-                ...basePayload,
-                slug: formData.nombre.toLowerCase().trim().replace(/[\s_-]+/g, '-'),
-                usuarioCreaId: 1,
-                estadoId: 1,
-                variantes: formData.variantes
-                    .filter(v => v.nombre && v.nombre.trim() !== '')
-                    .map(v => ({
-                        nombre: v.nombre,
-                        precio: parseFloat(v.precio) || 0
-                    }))
-            };
-            await addProduct(createPayload);
+            onClose();
+            alert('Operación exitosa');
+        } catch (error) {
+            console.error("Error:", error);
+            alert("Hubo un error al guardar el producto");
         }
-        onClose();
-        alert('Operación exitosa');
-    } catch (error) {
-        console.error("Error:", error.response?.data);
-    }
-};
+    };
 
     return (
         <div className='bg-white rounded-lg p-6 border border-gray-200 overflow-y-auto max-h-[90vh] shadow-xl'>
@@ -101,6 +119,34 @@ export const ProductForm = ({ product = null, onClose }) => {
             </h2>
 
             <form onSubmit={handleSubmit} className='space-y-4'>
+                
+                {/* 2. INPUT DE IMAGEN (NUEVO SECCIÓN) */}
+                <div className="flex gap-4 items-center mb-4 p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                    <div className="w-24 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
+                        {previewUrl ? (
+                            <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                        ) : (
+                            <HiOutlinePhoto className="text-gray-400 text-3xl" />
+                        )}
+                    </div>
+                    <div className="flex-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Producto</label>
+                        <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleImageChange}
+                            className="block w-full text-sm text-gray-500
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-full file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-cyan-50 file:text-cyan-700
+                                hover:file:bg-cyan-100"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Soporta JPG, PNG, WEBP (Max 5MB)</p>
+                    </div>
+                </div>
+
+                {/* INPUTS NORMALES (SIN CAMBIOS) */}
                 <div>
                     <label className='block text-sm font-medium text-gray-700 mb-1'>Nombre del Producto</label>
                     <input
@@ -146,7 +192,7 @@ export const ProductForm = ({ product = null, onClose }) => {
                     </div>
                 </div>
 
-                {/* SECCIÓN DE VARIANTES */}
+                {/* SECCIÓN DE VARIANTES (SIN CAMBIOS GRANDES) */}
                 <div className='border-t border-gray-100 pt-4 mt-4'>
                     <div className='flex justify-between items-center mb-3'>
                         <h3 className='font-bold text-gray-700'>Variantes (Opcional)</h3>

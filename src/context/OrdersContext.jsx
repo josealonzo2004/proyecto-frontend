@@ -1,67 +1,82 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { pedidosAPI } from "../services/api"; // IMPORTA TU API
+import { useAuth } from './AuthContext'; // Para saber si hay usuario logueado
 
 const OrdersContext = createContext();
 
 export const useOrders = () => {
     const context = useContext(OrdersContext);
-    if (!context) {
-        throw new Error('useOrders must be used within OrdersProvider');
-    }
+    if (!context) throw new Error('useOrders must be used within OrdersProvider');
     return context;
 };
 
 export const OrdersProvider = ({ children }) => {
     const [orders, setOrders] = useState([]);
+    const { user, isAdmin } = useAuth(); // Necesitamos saber quién es
 
-    useEffect(() => {
+    // 1. Función para cargar pedidos desde el Backend
+    const fetchOrders = useCallback(async () => {
         try {
-            const savedOrders = localStorage.getItem('orders');
-            if (savedOrders) {
-                const parsed = JSON.parse(savedOrders);
-                if (Array.isArray(parsed)) {
-                    setOrders(parsed);
-                }
+            // Hacemos la petición al backend
+            const { data } = await pedidosAPI.getAll();
+            
+            // Si es admin ve todos, si es usuario normal filtramos los suyos
+            // (Aunque lo ideal es que el backend filtre, por ahora filtramos aquí)
+            if (isAdmin) {
+                setOrders(data);
+            } else if (user) {
+                const misPedidos = data.filter(o => o.usuario?.email === user.email);
+                setOrders(misPedidos);
             }
         } catch (error) {
-            console.error('Error loading orders:', error);
+            console.error('Error cargando pedidos:', error);
+        }
+    }, [user, isAdmin]);
+
+    // Cargar pedidos al iniciar o cambiar de usuario
+    useEffect(() => {
+        if (user) {
+            fetchOrders();
+        } else {
             setOrders([]);
         }
-    }, []);
+    }, [user, fetchOrders]);
 
-    useEffect(() => {
+    // 2. Crear pedido (Conectado a la API)
+    const createOrder = async (orderData) => {
         try {
-            localStorage.setItem('orders', JSON.stringify(orders));
+            // orderData ya viene formateado desde CheckoutPage
+            const { data } = await pedidosAPI.create(orderData);
+            
+            // Recargamos la lista de pedidos para ver el nuevo
+            await fetchOrders();
+            return data;
         } catch (error) {
-            console.error('Error saving orders:', error);
+            console.error('Error creando pedido:', error);
+            throw error;
         }
-    }, [orders]);
-
-    const createOrder = (orderData) => {
-        const newOrder = {
-            id: Date.now(),
-            ...orderData,
-            estado: 'pendiente',
-            fecha: new Date().toISOString()
-        };
-        setOrders([...orders, newOrder]);
-        return newOrder;
     };
 
-    const updateOrderStatus = (id, status) => {
-        setOrders(orders.map(order => 
-            order.id === id ? { ...order, estado: status } : order
-        ));
-    };
-
-    const getOrdersByStatus = (status) => {
-        return orders.filter(order => order.estado === status);
+    // 3. Actualizar estado (Conectado a la API)
+    const updateOrderStatus = async (id, estadoId) => {
+        try {
+            // Enviar el estadoId como espera el backend
+            await pedidosAPI.update(id, { estadoId }); 
+            
+            await fetchOrders(); // Recargar
+            return { success: true };
+        } catch (error) {
+            console.error('Error actualizando estado:', error);
+            const errorMessage = error.response?.data?.message || "Error al actualizar el estado del pedido";
+            throw new Error(errorMessage);
+        }
     };
 
     const value = {
         orders,
         createOrder,
         updateOrderStatus,
-        getOrdersByStatus
+        fetchOrders // Exportamos por si queremos recargar manualmente
     };
 
     return <OrdersContext.Provider value={value}>{children}</OrdersContext.Provider>;
