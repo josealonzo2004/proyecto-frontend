@@ -3,7 +3,7 @@ import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { HiOutlineSearch, HiOutlineShoppingBag } from 'react-icons/hi'
 import { FaBarsStaggered } from 'react-icons/fa6'
 import { navbarLinks } from '../../constants/links'
-import { Logo } from './Logo'
+import { Logo } from './public/COMPLETO_NEGRO_SIN_FONDO'
 import { useAuth } from '../../context/AuthContext'
 import { useCart } from '../../context/CartContext'
 
