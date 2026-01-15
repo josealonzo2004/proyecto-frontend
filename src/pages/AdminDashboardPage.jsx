@@ -9,6 +9,8 @@ import { HiX } from 'react-icons/hi';
 import { ProductForm } from '../components/admin/ProductForm';
 import { OrderCard } from '../components/admin/OrderCard';
 import { useUsers } from '../context/UsersContext';
+import { devolucionesAPI } from "../services/api"; // Importar API
+import { useEffect } from 'react'; // Asegúrate de tener useEffect
 
 export const AdminDashboardPage = () => {
   const { isAdmin } = useAuth();
@@ -41,6 +43,42 @@ export const AdminDashboardPage = () => {
       </div>
     );
   }
+
+  const [returnsList, setReturnsList] = useState([]);
+
+  // Cargar devoluciones cuando se entra a la sección
+  useEffect(() => {
+      if (activeSection === 'returns') {
+          fetchReturns();
+      }
+    }, [activeSection]);
+
+    const fetchReturns = async () => {
+        try {
+          const res = await devolucionesAPI.getAll();
+          setReturnsList(res.data);
+      } catch (error) {
+          console.error("Error cargando devoluciones", error);
+    }
+  };
+
+  const handleReturnAction = async (id, nuevoEstadoId) => {
+    if(!confirm("¿Estás seguro de cambiar el estado de esta devolución?")) return;
+
+    try {
+        // Solo actualizamos el estadoId, mantenemos el resto
+        // Nota: Dependiendo de tu Backend, a veces pide enviar todo el objeto. 
+        // Intentaremos enviar solo lo necesario si tu DTO lo permite (PartialType).
+        // Si falla, tendrías que obtener la devolución completa primero.
+
+        await devolucionesAPI.update(id, { estadoId: nuevoEstadoId });
+        alert("Estado actualizado");
+        fetchReturns(); // Recargar lista
+    } catch (error) {
+        console.error(error);
+        alert("Error al actualizar estado");
+    }
+};
 
   // Estadísticas del dashboard
 
@@ -271,27 +309,52 @@ export const AdminDashboardPage = () => {
               </div>
             )}
 
-      {/* Devoluciones */}
-      {activeSection === 'returns' && (
-        <div className='bg-white rounded-lg border border-gray-200 p-6'>
-          <h2 className='text-xl font-bold mb-4'>Solicitudes de devolución</h2>
-          <div className='space-y-3'>
-            {[1, 2].map(item => (
-              <div key={item} className='p-4 bg-gray-50 rounded-lg'>
-                <div className='flex justify-between items-start mb-2'>
-                  <div><p className='font-semibold'>Devolución #RET00{item}</p><p className='text-sm text-gray-600'>Pedido: #1234{item}</p></div>
-                  <span className='px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm'>Pendiente</span>
-                </div>
-                <p className='text-gray-600 mb-2'>Razón: Producto con defecto</p>
-                <div className='flex gap-2'>
-                  <button className='px-4 py-1 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700'>Aprobar</button>
-                  <button className='px-4 py-1 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700'>Rechazar</button>
+            {activeSection === 'returns' && (
+              <div className='bg-white rounded-lg border border-gray-200 p-6'>
+                <h2 className='text-xl font-bold mb-4'>Solicitudes de devolución</h2>
+                <div className='space-y-3'>
+                  {returnsList.length === 0 ? (
+                      <p className="text-gray-500">No hay solicitudes pendientes.</p>
+                  ) : (
+                      returnsList.map(dev => (
+                        <div key={dev.devolucionId} className='p-4 bg-gray-50 rounded-lg border border-gray-200'>
+                          <div className='flex justify-between items-start mb-2'>
+                            <div>
+                                <p className='font-semibold'>Devolución #{dev.devolucionId}</p>
+                                <p className='text-sm text-gray-600'>Pedido (Factura) ID: {dev.facturaId}</p>
+                                <p className='text-sm text-gray-600 font-medium'>Motivo: {dev.motivo}</p>
+                            </div>
+                            <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                                dev.estadoId === 1 ? 'bg-yellow-100 text-yellow-800' : 
+                                dev.estadoId === 2 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }`}>
+                                {dev.estadoId === 1 ? 'PENDIENTE' : dev.estadoId === 2 ? 'APROBADO' : 'RECHAZADO'}
+                            </span>
+                          </div>
+
+                          {/* Solo mostrar botones si está pendiente (Estado 1) */}
+                          {dev.estadoId === 1 && (
+                              <div className='flex gap-2 mt-3'>
+                                <button 
+                                    onClick={() => handleReturnAction(dev.devolucionId, 2)}
+                                    className='px-4 py-1 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700'
+                                >
+                                    Aprobar
+                                </button>
+                                <button 
+                                    onClick={() => handleReturnAction(dev.devolucionId, 3)}
+                                    className='px-4 py-1 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700'
+                                >
+                                    Rechazar
+                                </button>
+                              </div>
+                          )}
+                        </div>
+                      ))
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            )}
 
       {/* Usuarios */}
       {activeSection === 'users' && (

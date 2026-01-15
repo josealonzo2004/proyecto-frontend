@@ -72,6 +72,26 @@ export const pedidosAPI = {
   delete: (id) => api.delete(`/pedidos/${id}`),
 };
 
+// ---- DEVOLUCIONES (NUEVO) ----
+export const devolucionesAPI = {
+  getAll: () => api.get('/devoluciones'),
+  getById: (id) => api.get(`/devoluciones/${id}`),
+  create: (data) => api.post('/devoluciones', data), // Crear solicitud
+  update: (id, data) => api.put(`/devoluciones/${id}`, data), // Aprobar/Rechazar (cambiar estado)
+  delete: (id) => api.delete(`/devoluciones/${id}`),
+};
+
+// ---- FACTURAS ----
+export const facturasAPI = {
+  // Obtener una factura específica (para mostrarla tras la compra)
+  getById: (id) => api.get(`/facturas/${id}`),
+  
+  // Crear factura (se llamaría al finalizar el checkout)
+  create: (datosCompra) => api.post('/facturas/generar', datosCompra),
+  
+  // Obtener todas (para historial de usuario o admin)
+  getAll: () => api.get('/facturas'),
+};
 
 export default api;
 

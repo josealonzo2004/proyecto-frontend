@@ -5,31 +5,58 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { HiArrowLeft } from 'react-icons/hi';
 import { Link } from 'react-router-dom';
+import { direccionesAPI } from '../services/api'; // Asegúrate que la ruta sea correcta
 
 export const CheckoutPage = () => {
+    // 1. Hooks personalizados
     const { cartItems, getTotal, clearCart } = useCart();
     const { createOrder } = useOrders();
     const { user } = useAuth();
     const navigate = useNavigate();
+
+    // 2. Estados (useState)
     const [step, setStep] = useState(1);
     const [transporte, setTransporte] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState(''); // Solo una vez
+    const [saveAddress, setSaveAddress] = useState(false);  // El nuevo que agregamos
+
     const [shippingAddress, setShippingAddress] = useState({
         callePrincipal: '',
         avenida: '',
         ciudad: '',
         provincia: '',
-        pais: 'Ecuador' // Valor por defecto
+        pais: 'Ecuador'
     });
-    const [paymentMethod, setPaymentMethod] = useState('');
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+const handleSubmit = async (e) => {
+    e.preventDefault();
 
-        if (step === 1) {
-            setStep(2);
-        } else if (step === 2) {
-            setStep(3);
-        } else {
+    if (step === 1) {
+        setStep(2);
+    } else if (step === 2) {
+        setStep(3);
+    } else {
+        // === INICIO LÓGICA DE GUARDADO DE DIRECCIÓN ===
+        if (saveAddress) {
+            try {
+                // Mapeamos los datos para que coincidan con tu DTO (create-direccion.dto.ts)
+                const nuevaDireccion = {
+                    usuarioId: user.usuarioId, // Necesario según tu DTO
+                    callePrincipal: shippingAddress.callePrincipal,
+                    avenida: shippingAddress.avenida || '', // Evitamos null
+                    ciudad: shippingAddress.ciudad,
+                    provincia: shippingAddress.provincia,
+                    pais: shippingAddress.pais
+                };
+
+                // Usamos la función que ya existe en tu api.js
+                await direccionesAPI.create(nuevaDireccion);
+                console.log("Dirección guardada correctamente en el perfil");
+            } catch (error) {
+                // Si falla el guardado de dirección, NO detenemos la compra, solo avisamos en consola
+                console.error("No se pudo guardar la dirección:", error);
+            }
+        }
             // Crear la orden
             const orderData = {
                 usuarioId: user?.usuarioId,
@@ -216,6 +243,20 @@ export const CheckoutPage = () => {
                         </div>
                     </div>
                 )}
+
+                {/* NUEVO: Checkbox para guardar dirección */}
+                <div className="mt-4 flex items-center p-2 bg-gray-50 rounded border border-gray-100">
+                    <input
+                        type="checkbox"
+                        id="saveAddress"
+                        checked={saveAddress}
+                        onChange={(e) => setSaveAddress(e.target.checked)}
+                        className="w-4 h-4 text-cyan-600 border-gray-300 rounded focus:ring-cyan-500 cursor-pointer"
+                    />
+                    <label htmlFor="saveAddress" className="ml-2 text-sm text-gray-700 cursor-pointer">
+                        Guardar esta dirección en mi perfil para futuras compras
+                    </label>
+                </div>
 
                 {step === 3 && (
                     <div className='bg-white rounded-lg p-6 border border-gray-200'>
