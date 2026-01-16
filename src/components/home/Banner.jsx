@@ -8,7 +8,7 @@ const images = [
 	'/images/hablador_genovesa.jpeg',
 	'/images/letrero_charliepops.jpeg',
 	'/images/letrero.jpeg',
-	'/images/servientrega.jpeg'
+	'/images/servientrega.jpeg',
 ];
 
 export const Banner = () => {
@@ -46,7 +46,7 @@ export const Banner = () => {
 					{/* Imagen principal */}
 					<div className='text-center mb-8'>
 						<img 
-							src='/img/cortamos_ideas_blanco.png' 
+							src='/images/cortamos_ideas_blanco.png' 
 							alt='Cortamos ideas, creamos momentos' 
 							className='max-w-full h-auto mx-auto'
 						/>
