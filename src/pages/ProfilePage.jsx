@@ -65,6 +65,7 @@ export const ProfilePage = () => {
         if (activeTab === 'returns' && user) {
             devolucionesAPI.getAll()
                 .then(res => {
+                    // Filtramos solo las mías
                     const misDevs = res.data.filter(d => d.usuarioCreaId === user.usuarioId);
                     setMisDevoluciones(misDevs);
                 })
@@ -127,10 +128,17 @@ export const ProfilePage = () => {
 
     // --- LÓGICA DE DEVOLUCIONES (MODAL) ---
 
-    const openReturnModal = (pedidoId, item) => {
-        setReturnItemData({ pedidoId, detalle: item });
+    // CORRECCIÓN 1: Recibir OBJETO PEDIDO COMPLETO
+    const openReturnModal = (pedido, item) => {
+        // Validación extra: Verificar que tenga factura
+        if (!pedido.factura) {
+             alert("Este pedido aún no tiene factura generada. Espera un momento o contacta a soporte.");
+             return;
+        }
+
+        setReturnItemData({ pedido: pedido, detalle: item });
         setReturnForm({ causa: '', comentario: '' }); 
-        setInvoiceFile(null); // Limpiar archivo previo
+        setInvoiceFile(null); 
         setShowReturnModal(true);
     };
 
@@ -154,16 +162,25 @@ export const ProfilePage = () => {
         }
 
         try {
-            // Nota: Como el backend no tiene campo de archivo aún, lo ponemos en el texto
             const archivoInfo = invoiceFile ? ` (Archivo adjunto: ${invoiceFile.name})` : '';
             const motivoFinal = `[${returnForm.causa}] - ${returnForm.comentario}${archivoInfo}`;
 
+            // CORRECCIÓN 2: Obtener ID real de la factura (NO del pedido)
+            const idFactura = returnItemData.pedido?.factura?.facturaId;
+            
+            if (!idFactura) {
+                throw new Error("No se pudo encontrar el ID de la factura asociada.");
+            }
+
             const nuevaDevolucion = {
-                facturaId: returnItemData.pedidoId, 
-                varianteId: returnItemData.detalle.variante?.varianteId || returnItemData.detalle.varianteId,
+                facturaId: Number(idFactura), 
+                varianteId: Number(returnItemData.detalle.variante?.varianteId || returnItemData.detalle.varianteId),
                 motivo: motivoFinal,
-                fechaDevolucion: new Date(),
-                estadoId: 1, // Pendiente
+                
+                // CORRECCIÓN 3: NO ENVIAMOS FECHA (El backend pondrá la suya automáticamente)
+                // fechaDevolucion: ... (ELIMINADO)
+
+                estadoId: 1, // 1 = Pendiente
                 usuarioCreaId: user.usuarioId
             };
 
@@ -172,10 +189,15 @@ export const ProfilePage = () => {
             alert("Solicitud enviada con éxito.");
             closeReturnModal();
             setActiveTab('returns');
+            
+            // Recargar lista
+            const res = await devolucionesAPI.getAll();
+            const misDevs = res.data.filter(d => d.usuarioCreaId === user.usuarioId);
+            setMisDevoluciones(misDevs);
 
         } catch (error) {
             console.error(error);
-            alert("Error al solicitar devolución.");
+            alert("Error al solicitar devolución: " + (error.response?.data?.message || error.message));
         }
     };
 
@@ -204,7 +226,7 @@ export const ProfilePage = () => {
                 ))}
             </div>
 
-            {/* TAB: PERFIL (Completo Original) */}
+            {/* TAB: PERFIL */}
             {activeTab === 'profile' && (
                 <div className='bg-white rounded-lg p-6 border border-gray-200'>
                     <h2 className='text-xl font-bold mb-4'>Información personal</h2>
@@ -233,6 +255,7 @@ export const ProfilePage = () => {
                                 type='email'
                                 defaultValue={user?.correoElectronico || ''}
                                 className='w-full px-4 py-2 border border-gray-300 rounded-lg'
+                                disabled 
                             />
                         </div>
                         <div>
@@ -329,19 +352,25 @@ export const ProfilePage = () => {
                                         <p className='text-sm font-semibold mb-2 text-gray-700'>Productos:</p>
                                         <div className='space-y-2'>
                                             {pedido.detalles.map((detalle, idx) => (
-                                                <div key={idx} className='flex justify-between text-sm items-center'>
+                                                <div key={idx} className='flex justify-between text-sm items-center py-2 border-b border-gray-100 last:border-0'>
                                                     <span className='text-gray-600'>
                                                         • {detalle.variante?.producto?.nombre || 'Producto'} 
                                                         <span className='text-gray-400'> (x{detalle.cantidad})</span>
                                                     </span>
                                                     <div className="flex items-center gap-4">
                                                         <span className='font-medium'>${Number(detalle.precio).toFixed(2)}</span>
-                                                        <button 
-                                                            onClick={() => openReturnModal(pedido.pedidoId, detalle)}
-                                                            className="text-cyan-600 hover:text-cyan-800 text-xs font-semibold underline flex items-center gap-1"
-                                                        >
-                                                            <HiReply /> Devolver
-                                                        </button>
+                                                        
+                                                        {/* BOTÓN DEVOLVER: Verifica factura antes de abrir modal */}
+                                                        {pedido.factura ? (
+                                                            <button 
+                                                                onClick={() => openReturnModal(pedido, detalle)} 
+                                                                className="text-cyan-600 hover:text-cyan-800 text-xs font-semibold underline flex items-center gap-1"
+                                                            >
+                                                                <HiReply /> Devolver
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-xs text-gray-300 cursor-not-allowed" title="Factura en proceso">No disponible</span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}
@@ -363,18 +392,40 @@ export const ProfilePage = () => {
                         </div>
                     ) : (
                         misDevoluciones.map(dev => (
-                            <div key={dev.devolucionId} className="bg-white p-4 rounded-lg border border-gray-200">
-                                <div className="flex justify-between">
-                                    <h3 className="font-bold">Solicitud #{dev.devolucionId}</h3>
-                                    <span className={`px-2 py-1 rounded text-xs ${
-                                        dev.estadoId === 1 ? 'bg-yellow-100 text-yellow-800' : 
-                                        dev.estadoId === 2 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                    }`}>
-                                        {dev.estadoId === 1 ? 'Pendiente' : dev.estadoId === 2 ? 'Aprobada' : 'Rechazada'}
-                                    </span>
+                            <div key={dev.devolucionId} className="bg-white p-4 rounded-lg border border-gray-200 flex gap-4 items-start">
+                                {/* FOTO DEL PRODUCTO */}
+                                <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
+                                    <img 
+                                        src={dev.variante?.producto?.imagen || '/images/logo1.png'} 
+                                        alt="Producto" 
+                                        className="w-full h-full object-cover"
+                                    />
                                 </div>
-                                <p className="text-sm text-gray-600 mt-1">{dev.motivo}</p>
-                                <p className="text-xs text-gray-400 mt-2">Fecha: {new Date(dev.fechaDevolucion).toLocaleDateString()}</p>
+
+                                <div className="flex-1">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            {/* NOMBRE DEL PRODUCTO */}
+                                            <h3 className="font-bold text-gray-800">
+                                                {dev.variante?.producto?.nombre || `Variante #${dev.varianteId}`}
+                                            </h3>
+                                            <p className="text-xs text-gray-500">Solicitud #{dev.devolucionId} • Factura #{dev.factura?.facturaId || dev.facturaId}</p>
+                                        </div>
+                                        <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                            dev.estadoId === 1 ? 'bg-yellow-100 text-yellow-800' : 
+                                            dev.estadoId === 2 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                        }`}>
+                                            {dev.estadoId === 1 ? 'Pendiente' : dev.estadoId === 2 ? 'Aprobada' : 'Rechazada'}
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="mt-2 bg-gray-50 p-2 rounded text-sm">
+                                        <p className="text-gray-700"><span className="font-semibold">Motivo:</span> {dev.motivo}</p>
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-2 text-right">
+                                        Fecha: {new Date(dev.fechaDevolucion).toLocaleDateString()}
+                                    </p>
+                                </div>
                             </div>
                         ))
                     )}
@@ -401,7 +452,10 @@ export const ProfilePage = () => {
                         <div className="mb-4 bg-gray-50 p-3 rounded border border-gray-100">
                             <p className="text-sm text-gray-500 mb-1">Vas a devolver:</p>
                             <p className="font-semibold text-gray-800">
-                                {returnItemData.detalle.variante?.producto?.nombre} (x{returnItemData.detalle.cantidad})
+                                {returnItemData.detalle.variante?.producto?.nombre || 'Producto'} (x{returnItemData.detalle.cantidad})
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                                De la Factura #{returnItemData.pedido.factura?.facturaId}
                             </p>
                         </div>
 
@@ -438,7 +492,7 @@ export const ProfilePage = () => {
 
                             {/* INPUT DE ARCHIVO (Factura) */}
                             <div className="mb-6">
-                                <label className="block text-sm font-semibold mb-2">Subir Factura / Evidencia</label>
+                                <label className="block text-sm font-semibold mb-2">Subir Foto/Evidencia (Opcional)</label>
                                 <div className="flex items-center justify-center w-full">
                                     <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
                                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -446,12 +500,12 @@ export const ProfilePage = () => {
                                             <p className="text-sm text-gray-500">
                                                 <span className="font-semibold">Click para subir</span>
                                             </p>
-                                            <p className="text-xs text-gray-500">PDF, PNG, JPG (Max. 5MB)</p>
+                                            <p className="text-xs text-gray-500">PDF, JPG, PNG (Max. 5MB)</p>
                                         </div>
                                         <input 
                                             type="file" 
                                             className="hidden" 
-                                            accept=".pdf,.png,.jpg,.jpeg"
+                                            accept=".pdf,.png,.jpg,.jpeg" 
                                             onChange={handleFileChange}
                                         />
                                     </label>

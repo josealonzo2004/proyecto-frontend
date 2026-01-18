@@ -3,9 +3,9 @@ import { useCart } from '../context/CartContext';
 import { useOrders } from '../context/OrdersContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { HiArrowLeft } from 'react-icons/hi';
+import { HiArrowLeft, HiPrinter, HiCheckCircle } from 'react-icons/hi';
 import { Link } from 'react-router-dom';
-import { direccionesAPI } from '../services/api'; // Asegúrate que la ruta sea correcta
+import { direccionesAPI } from '../services/api';
 
 export const CheckoutPage = () => {
     // 1. Hooks personalizados
@@ -17,8 +17,14 @@ export const CheckoutPage = () => {
     // 2. Estados (useState)
     const [step, setStep] = useState(1);
     const [transporte, setTransporte] = useState('');
-    const [paymentMethod, setPaymentMethod] = useState(''); // Solo una vez
-    const [saveAddress, setSaveAddress] = useState(false);  // El nuevo que agregamos
+    const [paymentMethod, setPaymentMethod] = useState('');
+    const [saveAddress, setSaveAddress] = useState(false);
+    
+    // NUEVO: Estado para bloquear el botón (Evita doble compra)
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // NUEVO: Estado para guardar la respuesta de éxito
+    const [purchaseSuccess, setPurchaseSuccess] = useState(null);
 
     const [shippingAddress, setShippingAddress] = useState({
         callePrincipal: '',
@@ -28,63 +34,82 @@ export const CheckoutPage = () => {
         pais: 'Ecuador'
     });
 
-const handleSubmit = async (e) => {
-    e.preventDefault();
+    const handleSubmit = async (e) => {
+        e.preventDefault();
 
-    if (step === 1) {
-        setStep(2);
-    } else if (step === 2) {
-        setStep(3);
-    } else {
-        // === INICIO LÓGICA DE GUARDADO DE DIRECCIÓN ===
-        if (saveAddress) {
+        if (step === 1) {
+            setStep(2);
+        } else if (step === 2) {
+            setStep(3);
+        } else {
+            // === PASO 3: CONFIRMACIÓN Y COMPRA ===
+            
+            // 1. Validaciones de seguridad
+            if (isSubmitting) return; // Si ya se envió, ignorar clics extra
+            if (cartItems.length === 0) return;
+
+            // 2. Bloquear botón
+            setIsSubmitting(true);
+
             try {
-                // Mapeamos los datos para que coincidan con tu DTO (create-direccion.dto.ts)
-                const nuevaDireccion = {
-                    usuarioId: user.usuarioId, // Necesario según tu DTO
-                    callePrincipal: shippingAddress.callePrincipal,
-                    avenida: shippingAddress.avenida || '', // Evitamos null
-                    ciudad: shippingAddress.ciudad,
-                    provincia: shippingAddress.provincia,
-                    pais: shippingAddress.pais
+                // Guardar dirección (Opcional)
+                if (saveAddress) {
+                    try {
+                        const nuevaDireccion = {
+                            usuarioId: user.usuarioId,
+                            callePrincipal: shippingAddress.callePrincipal,
+                            avenida: shippingAddress.avenida || '',
+                            ciudad: shippingAddress.ciudad,
+                            provincia: shippingAddress.provincia,
+                            pais: shippingAddress.pais
+                        };
+                        await direccionesAPI.create(nuevaDireccion);
+                    } catch (error) {
+                        console.error("No se pudo guardar dirección (no bloqueante):", error);
+                    }
+                }
+
+                // 3. Preparar datos de la orden
+                const orderData = {
+                    usuarioId: user?.usuarioId,
+                    direccion: shippingAddress,
+                    transporte: transporte,
+                    detalles: cartItems.map(item => {
+                        const detalle = {
+                            cantidad: item.quantity,
+                            precio: item.variant.precio
+                        };
+                        if (item.variant.varianteId) {
+                            detalle.varianteId = item.variant.varianteId;
+                        } else if (item.variant.productoId) {
+                            detalle.productoId = item.variant.productoId;
+                        }
+                        return detalle;
+                    }),
+                    contenidoTotal: getTotal(),
+                    metodoPago: paymentMethod
                 };
 
-                // Usamos la función que ya existe en tu api.js
-                await direccionesAPI.create(nuevaDireccion);
-                console.log("Dirección guardada correctamente en el perfil");
+                // 4. Crear orden y ESPERAR respuesta
+                const response = await createOrder(orderData);
+                
+                // 5. Guardar respuesta para mostrar la factura
+                setPurchaseSuccess(response);
+                
+                // 6. Limpiar carrito y avanzar al PASO 4 (Factura)
+                clearCart();
+                setStep(4); 
+
             } catch (error) {
-                // Si falla el guardado de dirección, NO detenemos la compra, solo avisamos en consola
-                console.error("No se pudo guardar la dirección:", error);
+                console.error("Error en checkout:", error);
+                alert("Hubo un error al procesar tu pedido. Por favor intenta de nuevo.");
+                setIsSubmitting(false); // Desbloquear solo si hubo error
             }
-        }
-            // Crear la orden
-            const orderData = {
-                usuarioId: user?.usuarioId,
-                direccion: shippingAddress,
-                transporte: transporte,
-                detalles: cartItems.map(item => {
-                    const detalle = {
-                        cantidad: item.quantity,
-                        precio: item.variant.precio
-                    };
-                    // Si tiene varianteId, lo usamos; sino, usamos productoId
-                    if (item.variant.varianteId) {
-                        detalle.varianteId = item.variant.varianteId;
-                    } else if (item.variant.productoId) {
-                        detalle.productoId = item.variant.productoId;
-                    }
-                    return detalle;
-                }),
-                contenidoTotal: getTotal(),
-                metodoPago: paymentMethod
-            };
-            await createOrder(orderData);
-            clearCart();
-            navigate('/perfil');
         }
     };
 
-    if (cartItems.length === 0) {
+    // Si el carrito está vacío y NO estamos en el paso final (Factura)
+    if (cartItems.length === 0 && step !== 4) { 
         return (
             <div className='text-center py-12'>
                 <p className='text-gray-500 text-lg mb-4'>No hay productos en el carrito</p>
@@ -96,41 +121,48 @@ const handleSubmit = async (e) => {
     }
 
     return (
-        <div className='max-w-4xl mx-auto'>
-            <Link
-                to='/carrito'
-                className='flex items-center gap-2 text-gray-600 hover:text-cyan-600 mb-6'
-            >
-                <HiArrowLeft size={20} />
-                Volver al carrito
-            </Link>
+        <div className='max-w-4xl mx-auto px-4 py-8'>
+            {/* Ocultamos navegación si ya compró (Paso 4) */}
+            {step !== 4 && (
+                <Link
+                    to='/carrito'
+                    className='flex items-center gap-2 text-gray-600 hover:text-cyan-600 mb-6'
+                >
+                    <HiArrowLeft size={20} />
+                    Volver al carrito
+                </Link>
+            )}
 
-            <h1 className='text-3xl font-bold mb-8'>Checkout</h1>
+            <h1 className='text-3xl font-bold mb-8 text-center md:text-left'>
+                {step === 4 ? '¡Compra Exitosa!' : 'Checkout'}
+            </h1>
 
-            {/* Progress indicator */}
-            <div className='flex items-center justify-center mb-8'>
-                <div className='flex items-center space-x-4'>
-                    {[1, 2, 3].map((s) => (
-                        <div key={s} className='flex items-center'>
-                            <div
-                                className={`w-10 h-10 rounded-full flex items-center justify-center ${s <= step ? 'bg-cyan-600 text-white' : 'bg-gray-200 text-gray-600'
-                                    }`}
-                            >
-                                {s}
-                            </div>
-                            {s < 3 && (
+            {/* Indicador de Progreso (Se oculta en paso 4) */}
+            {step !== 4 && (
+                <div className='flex items-center justify-center mb-8'>
+                    <div className='flex items-center space-x-4'>
+                        {[1, 2, 3].map((s) => (
+                            <div key={s} className='flex items-center'>
                                 <div
-                                    className={`w-16 h-1 ${s < step ? 'bg-cyan-600' : 'bg-gray-200'}`}
-                                />
-                            )}
-                        </div>
-                    ))}
+                                    className={`w-10 h-10 rounded-full flex items-center justify-center ${s <= step ? 'bg-cyan-600 text-white' : 'bg-gray-200 text-gray-600'
+                                        }`}
+                                >
+                                    {s}
+                                </div>
+                                {s < 3 && (
+                                    <div
+                                        className={`w-16 h-1 ${s < step ? 'bg-cyan-600' : 'bg-gray-200'}`}
+                                    />
+                                )}
+                            </div>
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
 
             <form onSubmit={handleSubmit}>
                 {step === 1 && (
-                    <div className='bg-white rounded-lg p-6 border border-gray-200'>
+                    <div className='bg-white rounded-lg p-6 border border-gray-200 shadow-sm'>
                         <h2 className='text-xl font-bold mb-4'>Dirección de envío</h2>
                         <div className='space-y-4'>
                             {/* Selector de Transporte */}
@@ -150,7 +182,7 @@ const handleSubmit = async (e) => {
                                 </select>
                             </div>
 
-                            {/* Calle Principal */}
+                            {/* Campos de dirección */}
                             <div>
                                 <label className='block font-semibold mb-2'>Calle Principal</label>
                                 <input
@@ -158,12 +190,9 @@ const handleSubmit = async (e) => {
                                     value={shippingAddress.callePrincipal}
                                     onChange={(e) => setShippingAddress({ ...shippingAddress, callePrincipal: e.target.value })}
                                     className='w-full px-4 py-2 border border-gray-300 rounded-lg'
-                                    placeholder='Ej: Av. 4 de Noviembre'
                                     required
                                 />
                             </div>
-
-                            {/* Avenida (Opcional en tu entity nullable: true) */}
                             <div>
                                 <label className='block font-semibold mb-2'>Avenida / Intersección</label>
                                 <input
@@ -171,11 +200,8 @@ const handleSubmit = async (e) => {
                                     value={shippingAddress.avenida}
                                     onChange={(e) => setShippingAddress({ ...shippingAddress, avenida: e.target.value })}
                                     className='w-full px-4 py-2 border border-gray-300 rounded-lg'
-                                    placeholder='Ej: Calle 113'
                                 />
                             </div>
-
-                            {/* Ciudad y Provincia */}
                             <div className='grid grid-cols-2 gap-4'>
                                 <div>
                                     <label className='block font-semibold mb-2'>Ciudad</label>
@@ -198,8 +224,6 @@ const handleSubmit = async (e) => {
                                     />
                                 </div>
                             </div>
-
-                            {/* País */}
                             <div>
                                 <label className='block font-semibold mb-2'>País</label>
                                 <input
@@ -210,89 +234,190 @@ const handleSubmit = async (e) => {
                                     required
                                 />
                             </div>
-                        </div>
-                    </div>
-                )}
-
-                {step === 2 && (
-                    <div className='bg-white rounded-lg p-6 border border-gray-200'>
-                        <h2 className='text-xl font-bold mb-4'>Método de pago</h2>
-                        <div className='space-y-2'>
-                            <label className='flex items-center p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50'>
+                            
+                            {/* Checkbox guardar dirección */}
+                            <div className="flex items-center p-3 bg-gray-50 rounded border border-gray-200 mt-2">
                                 <input
-                                    type='radio'
-                                    name='payment'
-                                    value='Transferencia bancaria'
-                                    onChange={(e) => setPaymentMethod(e.target.value)}
-                                    className='mr-3'
-                                    required
+                                    type="checkbox"
+                                    id="saveAddress"
+                                    checked={saveAddress}
+                                    onChange={(e) => setSaveAddress(e.target.checked)}
+                                    className="w-4 h-4 text-cyan-600 rounded focus:ring-cyan-500 cursor-pointer"
                                 />
-                                Transferencia bancaria
-                            </label>
-                            <label className='flex items-center p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50'>
-                                <input
-                                    type='radio'
-                                    name='payment'
-                                    value='Depósito'
-                                    onChange={(e) => setPaymentMethod(e.target.value)}
-                                    className='mr-3'
-                                    required
-                                />
-                                Depósito
-                            </label>
-                        </div>
-                    </div>
-                )}
-
-                {/* NUEVO: Checkbox para guardar dirección */}
-                <div className="mt-4 flex items-center p-2 bg-gray-50 rounded border border-gray-100">
-                    <input
-                        type="checkbox"
-                        id="saveAddress"
-                        checked={saveAddress}
-                        onChange={(e) => setSaveAddress(e.target.checked)}
-                        className="w-4 h-4 text-cyan-600 border-gray-300 rounded focus:ring-cyan-500 cursor-pointer"
-                    />
-                    <label htmlFor="saveAddress" className="ml-2 text-sm text-gray-700 cursor-pointer">
-                        Guardar esta dirección en mi perfil para futuras compras
-                    </label>
-                </div>
-
-                {step === 3 && (
-                    <div className='bg-white rounded-lg p-6 border border-gray-200'>
-                        <h2 className='text-xl font-bold mb-4'>Resumen del pedido</h2>
-                        <div className='space-y-2 mb-4'>
-                            {cartItems.map(item => (
-                                <div key={item.id} className='flex justify-between'>
-                                    <span>{item.product.nombre} x{item.quantity}</span>
-                                    <span>${(item.variant.precio * item.quantity).toLocaleString()}</span>
-                                </div>
-                            ))}
-                            <div className='border-t pt-2 flex justify-between font-bold text-lg'>
-                                <span>Total a pagar</span>
-                                <span className='text-cyan-600'>${getTotal().toLocaleString()}</span>
+                                <label htmlFor="saveAddress" className="ml-2 text-sm text-gray-700 cursor-pointer font-medium">
+                                    Guardar esta dirección para futuras compras
+                                </label>
                             </div>
                         </div>
                     </div>
                 )}
 
-                <div className='flex justify-between mt-8'>
-                    {step > 1 && (
+                {step === 2 && (
+                    <div className='bg-white rounded-lg p-6 border border-gray-200 shadow-sm'>
+                        <h2 className='text-xl font-bold mb-4'>Método de pago</h2>
+                        <div className='space-y-3'>
+                            {['Transferencia bancaria', 'Depósito'].map((method) => (
+                                <label key={method} className={`flex items-center p-4 border rounded-lg cursor-pointer transition-all ${paymentMethod === method ? 'border-cyan-600 bg-cyan-50' : 'border-gray-300 hover:bg-gray-50'}`}>
+                                    <input
+                                        type='radio'
+                                        name='payment'
+                                        value={method}
+                                        onChange={(e) => setPaymentMethod(e.target.value)}
+                                        className='mr-3 text-cyan-600 focus:ring-cyan-500'
+                                        required
+                                    />
+                                    {method}
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {step === 3 && (
+                    <div className='bg-white rounded-lg p-6 border border-gray-200 shadow-sm'>
+                        <h2 className='text-xl font-bold mb-4'>Resumen del pedido</h2>
+                        
+                        <div className="mb-6 p-4 bg-blue-50 text-blue-800 text-sm rounded-lg border border-blue-100 flex items-start gap-2">
+                            <span className="text-xl">ℹ️</span>
+                            <div>
+                                <p className="font-bold">Facturación Automática</p>
+                                <p>Al confirmar, se generará tu factura electrónica vinculada a este pedido.</p>
+                            </div>
+                        </div>
+
+                        <div className='space-y-3 mb-6'>
+                            {cartItems.map(item => (
+                                <div key={item.id} className='flex justify-between items-center py-2 border-b border-gray-100 last:border-0'>
+                                    <div>
+                                        <p className="font-medium">{item.product.nombre}</p>
+                                        <p className="text-sm text-gray-500">Cant: {item.quantity} | {item.variant.nombre}</p>
+                                    </div>
+                                    <span className="font-semibold">${(item.variant.precio * item.quantity).toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </div>
+                        
+                        <div className='border-t pt-4 flex justify-between items-center'>
+                            <span className='text-gray-600'>Total a pagar</span>
+                            <span className='text-2xl font-bold text-cyan-600'>${getTotal().toLocaleString()}</span>
+                        </div>
+                    </div>
+                )}
+
+                {/* === PASO 4: VISTA DE FACTURA / RECIBO === */}
+                {step === 4 && purchaseSuccess && (
+                    <div className="animate-fade-in">
+                        <div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto border border-gray-200 print:shadow-none print:border-0">
+                            
+                            {/* Mensaje de éxito (No imprimir) */}
+                            <div className="text-center mb-8 print:hidden">
+                                <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <HiCheckCircle size={40} />
+                                </div>
+                                <h2 className="text-2xl font-bold text-gray-800">¡Pedido Confirmado!</h2>
+                                <p className="text-gray-500">Hemos enviado los detalles a tu correo.</p>
+                            </div>
+
+                            {/* ÁREA DE IMPRESIÓN (RECIBO) */}
+                            <div className="border-t-2 border-gray-800 pt-6">
+                                <div className="flex justify-between items-start mb-6">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-gray-900">TU TIENDA S.A.</h3>
+                                        <p className="text-xs text-gray-500">RUC: 0999999999001</p>
+                                        <p className="text-xs text-gray-500">Manta, Ecuador</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm font-bold text-gray-600">COMPROBANTE</p>
+                                        <p className="text-lg font-mono text-gray-900">#{String(purchaseSuccess.pedidoId || '000').padStart(6, '0')}</p>
+                                        <p className="text-xs text-gray-500">{new Date().toLocaleDateString()}</p>
+                                    </div>
+                                </div>
+
+                                <div className="mb-6 bg-gray-50 p-4 rounded text-sm">
+                                    <p><span className="font-bold">Cliente:</span> {user?.nombre || user?.email}</p>
+                                    <p><span className="font-bold">Dirección:</span> {shippingAddress.callePrincipal}, {shippingAddress.ciudad}</p>
+                                    <p><span className="font-bold">Transporte:</span> {transporte}</p>
+                                </div>
+
+                                <table className="w-full text-sm mb-6">
+                                    <thead>
+                                        <tr className="border-b border-gray-300">
+                                            <th className="text-left py-2">Desc.</th>
+                                            <th className="text-center py-2">Cant.</th>
+                                            <th className="text-right py-2">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {/* Usamos los detalles retornados por el backend si existen */}
+                                        {(purchaseSuccess.detalles || cartItems).map((item, i) => (
+                                            <tr key={i} className="border-b border-gray-100">
+                                                <td className="py-2">
+                                                    {item.variant?.producto?.nombre || item.product?.nombre || 'Producto'}
+                                                </td>
+                                                <td className="py-2 text-center">{item.cantidad || item.quantity}</td>
+                                                <td className="py-2 text-right">
+                                                    ${((item.precio || item.variant?.precio || 0) * (item.cantidad || item.quantity)).toFixed(2)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+
+                                <div className="flex justify-end border-t pt-4">
+                                    <div className="text-right">
+                                        <p className="text-sm text-gray-600">Subtotal: ${(purchaseSuccess.total / 1.15).toFixed(2)}</p>
+                                        <p className="text-sm text-gray-600">IVA (15%): ${(purchaseSuccess.total - (purchaseSuccess.total / 1.15)).toFixed(2)}</p>
+                                        <p className="text-xl font-bold text-gray-900 mt-1">Total: ${Number(purchaseSuccess.total).toFixed(2)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Botones finales */}
+                        <div className="flex justify-center gap-4 mt-8 pb-12 print:hidden">
+                            <button
+                                onClick={() => window.print()}
+                                className="flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors shadow-lg"
+                            >
+                                <HiPrinter size={20} />
+                                Imprimir Comprobante
+                            </button>
+                            <button
+                                onClick={() => navigate('/productos')}
+                                className="px-6 py-3 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                            >
+                                Seguir Comprando
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Botones de navegación (Solo si NO estamos en paso 4) */}
+                {step !== 4 && (
+                    <div className='flex justify-between mt-8'>
+                        {step > 1 && (
+                            <button
+                                type='button'
+                                onClick={() => setStep(step - 1)}
+                                disabled={isSubmitting} // Bloquear volver
+                                className='px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50'
+                            >
+                                Anterior
+                            </button>
+                        )}
                         <button
-                            type='button'
-                            onClick={() => setStep(step - 1)}
-                            className='px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50'
+                            type='submit'
+                            disabled={isSubmitting} // Bloquear confirmar
+                            className={`ml-auto px-6 py-2 text-white rounded-lg font-medium transition-colors ${
+                                isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-cyan-600 hover:bg-cyan-700'
+                            }`}
                         >
-                            Anterior
+                            {isSubmitting 
+                                ? 'Procesando...' 
+                                : step < 3 ? 'Siguiente' : 'Confirmar Pedido'}
                         </button>
-                    )}
-                    <button
-                        type='submit'
-                        className='ml-auto px-6 py-2 bg-cyan-600 text-white rounded-lg font-medium hover:bg-cyan-700'
-                    >
-                        {step < 3 ? 'Siguiente' : 'Confirmar pedido'}
-                    </button>
-                </div>
+                    </div>
+                )}
             </form>
         </div>
     );

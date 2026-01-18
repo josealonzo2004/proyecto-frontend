@@ -50,14 +50,33 @@ export const ProductsPage = () => {
             {/* CAMBIO: Usamos 'grid-cols-2' en móvil y 'lg:grid-cols-4' en PC */}
             <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4'>
                 {filteredProducts.map(product => {
-                    // ... lógica de variante ...
                     return (
                         <ProductCard
-                            key={product.productoId} // Usa productoId
+                            key={product.productoId} 
                             product={product}
                             onAddToCart={() => {
-                                // ... tu lógica de agregar ...
-                                alert("Producto agregado al carrito"); // Solución problema 2 (rápida)
+                                // 1. Definir qué variante agregar (la primera o una estándar)
+                                let variantToAdd;
+                                
+                                if (product.variantes && product.variantes.length > 0) {
+                                    // Si tiene variantes, tomamos la primera por defecto
+                                    variantToAdd = product.variantes[0];
+                                } else {
+                                    // Si no tiene, creamos una variante "dummy" con los datos del producto
+                                    variantToAdd = {
+                                        nombre: 'Estándar',
+                                        precio: product.precio,
+                                        productoId: product.productoId,
+                                        varianteId: null // Opcional, dependiendo de tu backend
+                                    };
+                                }
+
+                                // 2. Llamar a la función real del contexto
+                                // addToCart(producto, variante, personalizacion)
+                                addToCart(product, variantToAdd, null); 
+
+                                // 3. Avisar al usuario
+                                alert("¡Producto agregado al carrito correctamente!");
                             }}
                         />
                     );

@@ -1,453 +1,692 @@
 // src/pages/AdminDashboardPage.jsx
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useProducts } from '../context/ProductsContext';
 import { useOrders } from '../context/OrdersContext';
-import { useNavigate } from 'react-router-dom';
-import { HiOutlineChartBar, HiOutlineShoppingBag, HiOutlineUsers } from 'react-icons/hi2';
-import { HiX } from 'react-icons/hi';
-import { ProductForm } from '../components/admin/ProductForm';
-import { OrderCard } from '../components/admin/OrderCard';
 import { useUsers } from '../context/UsersContext';
-import { devolucionesAPI } from "../services/api"; // Importar API
-import { useEffect } from 'react'; // Asegúrate de tener useEffect
+import { devolucionesAPI, pedidosAPI } from "../services/api"; // Importamos pedidosAPI
+
+// ICONOS
+import { 
+  HiOutlineChartBar, HiOutlineShoppingBag, HiOutlineUsers, 
+  HiCheck, HiX, HiFilter, HiPrinter, HiDocumentText, 
+  HiSearch, HiChevronLeft, HiChevronRight, HiPlus,
+  HiEye, HiTrash, HiSave
+} from 'react-icons/hi';
+import { ProductForm } from '../components/admin/ProductForm';
+
+// --- COMPONENTE INTERNO DE PAGINACIÓN ---
+const Pagination = ({ totalItems, itemsPerPage, currentPage, onPageChange }) => {
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    if (totalPages <= 1) return null;
+
+    return (
+        <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4">
+            <div className="flex flex-1 justify-between sm:hidden">
+                <button onClick={() => onPageChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">Anterior</button>
+                <button onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">Siguiente</button>
+            </div>
+            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                <div>
+                    <p className="text-sm text-gray-700">
+                        Mostrando <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> a <span className="font-medium">{Math.min(currentPage * itemsPerPage, totalItems)}</span> de <span className="font-medium">{totalItems}</span> resultados
+                    </p>
+                </div>
+                <div>
+                    <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                        <button onClick={() => onPageChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"><HiChevronLeft className="h-5 w-5" /></button>
+                        {[...Array(totalPages)].map((_, i) => (
+                             <button 
+                                key={i + 1}
+                                onClick={() => onPageChange(i + 1)}
+                                className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${currentPage === i + 1 ? 'z-10 bg-cyan-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600' : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'}`}
+                             >
+                                {i + 1}
+                             </button>
+                        ))}
+                        <button onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"><HiChevronRight className="h-5 w-5" /></button>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 export const AdminDashboardPage = () => {
   const { isAdmin } = useAuth();
   const { products, deleteProduct } = useProducts();
-  const { orders } = useOrders();
-  const navigate = useNavigate();
+  const { orders, fetchOrders } = useOrders(); // Necesitamos fetchOrders para recargar al cambiar estado
+  
+  // SECCIONES Y ESTADOS GLOBALES
   const [activeSection, setActiveSection] = useState('dashboard');
+  const ITEMS_PER_PAGE = 8;
+  
+  // Productos
+  const [productSearch, setProductSearch] = useState('');
+  const [productPage, setProductPage] = useState(1);
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
-  // USERS
-  const { users = [], loadingUsers = false, fetchUsers, createUser, updateUser, deleteUser } = useUsers();
+  // Pedidos
+  const [orderSearch, setOrderSearch] = useState('');
+  const [orderPage, setOrderPage] = useState(1);
+  const [showOrderDetails, setShowOrderDetails] = useState(false); // Nuevo Modal Detalle
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
-  // Form state para crear/editar usuario
-  const [userForm, setUserForm] = useState({
-    nombre: '',
-    apellido: '',
-    correoElectronico: '',
-    telefono: '',
-    contrasenaFriada: '',
-    rolId: 1,
-  });
-  const [editingUserId, setEditingUserId] = useState(null);
-  const [search, setSearch] = useState('');
-
-  if (!isAdmin) {
-    return (
-      <div className='text-center py-12'>
-        <p className='text-red-600 text-lg'>No tienes permisos para acceder a esta página</p>
-      </div>
-    );
-  }
-
+  // Devoluciones
   const [returnsList, setReturnsList] = useState([]);
+  const [returnFilter, setReturnFilter] = useState('pending');
+  const [returnPage, setReturnPage] = useState(1);
 
-  // Cargar devoluciones cuando se entra a la sección
+  // Usuarios
+  const { users = [], fetchUsers, createUser, updateUser, deleteUser } = useUsers();
+  const [userSearch, setUserSearch] = useState('');
+  const [userPage, setUserPage] = useState(1);
+  const [userForm, setUserForm] = useState({ nombre: '', apellido: '', correoElectronico: '', telefono: '', contrasenaFriada: '', rolId: 1 });
+  const [editingUserId, setEditingUserId] = useState(null);
+
+  // Factura Modal
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState(null);
+
+  // --- CARGA INICIAL ---
   useEffect(() => {
-      if (activeSection === 'returns') {
-          fetchReturns();
-      }
-    }, [activeSection]);
+      if (activeSection === 'returns') fetchReturns();
+      if (users.length === 0) fetchUsers();
+  }, [activeSection]);
 
-    const fetchReturns = async () => {
-        try {
-          const res = await devolucionesAPI.getAll();
-          setReturnsList(res.data);
+  const fetchReturns = async () => {
+      try {
+        const res = await devolucionesAPI.getAll();
+        setReturnsList(res.data);
+    } catch (error) { console.error(error); }
+  };
+
+  // --- LÓGICA PEDIDOS ---
+  
+  // Cambiar estado desde el Select
+  const handleOrderStatusChange = async (orderId, newStatus) => {
+      try {
+          // Asumiendo que tu backend tiene un endpoint update
+          await pedidosAPI.update(orderId, { estadoId: Number(newStatus) });
+          // Recargamos los pedidos para ver el cambio
+          if(fetchOrders) await fetchOrders(); 
+          alert("Estado actualizado correctamente");
       } catch (error) {
-          console.error("Error cargando devoluciones", error);
-    }
+          console.error(error);
+          alert("Error al actualizar el estado");
+      }
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+      if(!confirm("¿ESTÁS SEGURO? Eliminar un pedido es irreversible.")) return;
+      try {
+          await pedidosAPI.delete(orderId);
+          if(fetchOrders) await fetchOrders();
+          setShowOrderDetails(false); // Cerrar modal si estaba abierto
+          alert("Pedido eliminado");
+      } catch (error) {
+          console.error(error);
+          alert("Error al eliminar pedido");
+      }
+  };
+
+  const handleOpenOrderDetails = (order) => {
+      setSelectedOrder(order);
+      setShowOrderDetails(true);
+  };
+
+  // --- LÓGICA FACTURA ---
+  const handleOpenInvoice = (order) => {
+      if (!order?.factura) return alert("Este pedido no tiene factura generada.");
+      setSelectedOrderForInvoice(order);
+      setShowInvoice(true);
+      // Si abrimos factura desde el detalle, podemos mantener el detalle abierto o cerrarlo.
+      // Lo dejaremos abierto debajo.
+  };
+  
+  const handleOpenInvoiceFromReturn = (devolucion) => {
+      const facturaId = devolucion.factura?.facturaId || devolucion.facturaId;
+      const order = orders.find(o => (o.factura?.facturaId === facturaId) || (o.facturaId === facturaId));
+      if (order) handleOpenInvoice(order);
+      else alert("Factura no encontrada en memoria.");
   };
 
   const handleReturnAction = async (id, nuevoEstadoId) => {
-    if(!confirm("¿Estás seguro de cambiar el estado de esta devolución?")) return;
-
+    const accion = nuevoEstadoId === 2 ? "APROBAR" : "RECHAZAR";
+    if(!confirm(`¿${accion} esta solicitud?`)) return;
     try {
-        // Solo actualizamos el estadoId, mantenemos el resto
-        // Nota: Dependiendo de tu Backend, a veces pide enviar todo el objeto. 
-        // Intentaremos enviar solo lo necesario si tu DTO lo permite (PartialType).
-        // Si falla, tendrías que obtener la devolución completa primero.
-
         await devolucionesAPI.update(id, { estadoId: nuevoEstadoId });
-        alert("Estado actualizado");
-        fetchReturns(); // Recargar lista
-    } catch (error) {
-        console.error(error);
-        alert("Error al actualizar estado");
-    }
-};
-
-  // Estadísticas del dashboard
-
-  const pendingOrders = (orders || []).filter(o => o.estado?.descripcion === 'pendiente' || o.estadoId === 1); 
-  const totalRevenue = (orders || []).reduce((sum, order) => sum + (Number(order.contenidoTotal) || 0), 0);
-
-  // Filtrar usuarios "normales" (no admins).
-  // Aquí se asume rolId === 2 == admin. Si en tu DB el id es otro, cámbialo.
-  //useMemo para evitar recalculos innecesarios cuando users no cambia
-  const normalUsers = useMemo(() => {
-    //retorna todos los usuarios que no son admin
-    return (users || []).filter(u => u.rolId !== 2);
-  }, [users]);
-
-  const stats = [
-    { label: 'Ventas totales', value: `$${totalRevenue.toLocaleString()}`, icon: HiOutlineChartBar },
-    { label: 'Pedidos pendientes', value: pendingOrders.length.toString(), icon: HiOutlineShoppingBag },
-    { label: 'Total pedidos', value: (orders || []).length.toString(), icon: HiOutlineShoppingBag },
-    // Nueva tarjeta para usuarios normales
-    { label: 'Usuarios', value: (normalUsers || []).length.toString(), icon: HiOutlineUsers },
-  ];
-
-  const handleEditProduct = (product) => {
-    setEditingProduct(product);
-    setShowProductForm(true);
+        fetchReturns(); 
+    } catch (error) { alert("Error al actualizar"); }
   };
 
-  const handleCloseForm = () => {
-    setShowProductForm(false);
-    setEditingProduct(null);
-  };
-
-  // USUARIOS: filtrado cliente-side para la pestaña Users
-  const q = search.trim().toLowerCase();
-  const filteredUsers = users.filter(u => {
-    if (!q) return true;
-    return (`${u.nombre} ${u.apellido}`).toLowerCase().includes(q) ||
-      (u.correoElectronico || '').toLowerCase().includes(q);
-  });
-
-  const startEditUser = (u) => {
-    setEditingUserId(u.usuarioId);
-    setUserForm({
-      nombre: u.nombre || '',
-      apellido: u.apellido || '',
-      correoElectronico: u.correoElectronico || '',
-      telefono: u.telefono || '',
-      contrasenaFriada: '',
-      rolId: u.rolId ?? 1,
-    });
-    setActiveSection('users');
-  };
-
-  const handleUserSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (editingUserId) {
+  const handleUserSubmit = async (e) => { 
+      e.preventDefault();
+      try {
         const payload = { ...userForm };
         if (!payload.contrasenaFriada) delete payload.contrasenaFriada;
-        await updateUser(editingUserId, payload);
-        alert('Usuario actualizado');
+        if (editingUserId) await updateUser(editingUserId, payload);
+        else await createUser(userForm);
+        setUserForm({ nombre: '', apellido: '', correoElectronico: '', telefono: '', contrasenaFriada: '', rolId: 1 });
         setEditingUserId(null);
-      } else {
-        await createUser(userForm);
-        alert('Usuario creado');
-      }
-      setUserForm({ nombre: '', apellido: '', correoElectronico: '', telefono: '', contrasenaFriada: '', rolId: 1 });
-      await fetchUsers();
-    } catch (err) {
-      console.error(err);
-      alert(err.message || 'Error al guardar usuario');
-    }
+        await fetchUsers();
+        alert('Usuario guardado');
+      } catch (err) { alert(err.message); }
   };
 
+  const getUserName = (id) => {
+      const u = users.find(user => user.usuarioId === id);
+      return u ? `${u.nombre} ${u.apellido}` : `ID: ${id}`;
+  };
+
+  // --- FILTRADO Y PAGINACIÓN ---
+  const filteredProducts = (products || []).filter(p => p.nombre.toLowerCase().includes(productSearch.toLowerCase()));
+  const paginatedProducts = filteredProducts.slice((productPage - 1) * ITEMS_PER_PAGE, productPage * ITEMS_PER_PAGE);
+
+  const filteredOrders = (orders || []).filter(o => 
+      o.pedidoId.toString().includes(orderSearch) || 
+      `${o.usuario?.nombre} ${o.usuario?.apellido}`.toLowerCase().includes(orderSearch.toLowerCase())
+  ).sort((a,b) => new Date(b.fechaCreacion) - new Date(a.fechaCreacion));
+  const paginatedOrders = filteredOrders.slice((orderPage - 1) * ITEMS_PER_PAGE, orderPage * ITEMS_PER_PAGE);
+
+  const filteredReturns = returnsList.filter(dev => {
+      return returnFilter === 'pending' ? dev.estadoId === 1 : dev.estadoId !== 1;
+  });
+  const paginatedReturns = filteredReturns.slice((returnPage - 1) * ITEMS_PER_PAGE, returnPage * ITEMS_PER_PAGE);
+
+  const filteredUsers = users.filter(u => 
+      `${u.nombre} ${u.apellido} ${u.correoElectronico}`.toLowerCase().includes(userSearch.toLowerCase())
+  );
+  const paginatedUsers = filteredUsers.slice((userPage - 1) * ITEMS_PER_PAGE, userPage * ITEMS_PER_PAGE);
+
+
+  if (!isAdmin) return <div className='flex h-screen items-center justify-center text-red-600 font-bold'>Acceso Restringido</div>;
+
   return (
-    <div className='max-w-7xl mx-auto'>
-      <h1 className='text-3xl font-bold mb-8'>Panel de administración</h1>
-
-      {/* Tabs */}
-      <div className='flex gap-2 mb-8 border-b overflow-x-auto'>
-        <button onClick={() => setActiveSection('dashboard')} className={`pb-2 px-4 font-semibold whitespace-nowrap ${activeSection === 'dashboard' ? 'border-b-2 border-cyan-600 text-cyan-600' : 'text-gray-600'}`}>Dashboard</button>
-        <button onClick={() => setActiveSection('products')} className={`pb-2 px-4 font-semibold whitespace-nowrap ${activeSection === 'products' ? 'border-b-2 border-cyan-600 text-cyan-600' : 'text-gray-600'}`}>Productos</button>
-        <button onClick={() => setActiveSection('orders')} className={`pb-2 px-4 font-semibold whitespace-nowrap ${activeSection === 'orders' ? 'border-b-2 border-cyan-600 text-cyan-600' : 'text-gray-600'}`}>Pedidos</button>
-        <button onClick={() => setActiveSection('returns')} className={`pb-2 px-4 font-semibold whitespace-nowrap ${activeSection === 'returns' ? 'border-b-2 border-cyan-600 text-cyan-600' : 'text-gray-600'}`}>Devoluciones</button>
-        <button onClick={() => setActiveSection('users')} className={`pb-2 px-4 font-semibold whitespace-nowrap ${activeSection === 'users' ? 'border-b-2 border-cyan-600 text-cyan-600' : 'text-gray-600'}`}>Usuarios</button>
-      </div>
-
-      {/* Contenido: Dashboard */}
-      {activeSection === 'dashboard' && (
-        <div className='space-y-6'>
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4'>
-            {stats.map((stat, index) => (
-              <div key={index} className='bg-white rounded-lg p-6 border border-gray-200'>
-                <div className='flex items-center justify-between mb-2'>
-                  <stat.icon size={32} className='text-cyan-600' />
-                </div>
-                <p className='text-2xl font-bold'>{stat.value}</p>
-                <p className='text-gray-600 text-sm'>{stat.label}</p>
-              </div>
+    <div className='max-w-7xl mx-auto px-4 py-8 min-h-screen bg-gray-50'>
+      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+          <h1 className='text-3xl font-bold text-gray-800 tracking-tight'>Panel de Control</h1>
+          <div className="flex bg-white rounded-lg p-1 shadow-sm border border-gray-200 overflow-x-auto max-w-full">
+             {['dashboard', 'products', 'orders', 'returns', 'users'].map(sec => (
+                <button 
+                    key={sec}
+                    onClick={() => setActiveSection(sec)} 
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all whitespace-nowrap ${
+                        activeSection === sec 
+                        ? 'bg-cyan-600 text-white shadow-sm' 
+                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                    }`}
+                >
+                    {sec === 'returns' ? 'Devoluciones' : sec === 'users' ? 'Usuarios' : sec === 'orders' ? 'Pedidos' : sec === 'products' ? 'Productos' : 'Resumen'}
+                </button>
             ))}
           </div>
+      </div>
 
-          {orders && orders.length > 0 && (
-            <div className='bg-white rounded-lg p-6 border border-gray-200'>
-              <h2 className='text-xl font-bold mb-4'>Pedidos recientes</h2>
-              <div className='space-y-3'>
-                {orders
-                  .sort((a, b) => new Date(b.fechaCreacion) - new Date(a.fechaCreacion))
-                  .slice(0, 5)
-                  .map(order => {
-                    // Función para obtener color del badge
-                    const getStatusColor = (estadoId) => {
-                      const colors = {
-                        1: 'bg-yellow-100 text-yellow-800',
-                        2: 'bg-blue-100 text-blue-800',
-                        3: 'bg-purple-100 text-purple-800',
-                        4: 'bg-green-100 text-green-800',
-                        5: 'bg-red-100 text-red-800'
-                      };
-                      return colors[estadoId] || colors[1];
-                    };
-
-                    // Función para obtener nombre del estado
-                    const getEstadoNombre = (estadoId) => {
-                      const estados = {
-                        1: 'Pendiente',
-                        2: 'En proceso',
-                        3: 'Enviado',
-                        4: 'Entregado',
-                        5: 'Cancelado'
-                      };
-                      return estados[estadoId] || 'Pendiente';
-                    };
-
-                    const estadoId = order.estado?.estadoId || order.estadoId || 1;
-
-                    return (
-                      <div key={order.pedidoId} className='flex justify-between items-center pb-3 border-b last:border-0'>
-                        <div>
-                          <p className='font-semibold'>Pedido #{order.pedidoId}</p>
-                          <p className='text-sm text-gray-600'>
-                            Cliente: {order.usuario?.nombre || 'Usuario'} {order.usuario?.apellido || ''}
-                          </p>
-                          <p className='text-xs text-gray-400'>
-                            {new Date(order.fechaCreacion).toLocaleDateString('es-ES', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </p>
-                        </div>
-                        <div className='text-right flex flex-col items-end gap-2'>
-                          <p className='font-semibold text-lg'>${Number(order.contenidoTotal).toLocaleString()}</p>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(estadoId)}`}>
-                            {getEstadoNombre(estadoId)}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })} 
+      {/* === SECCIÓN DASHBOARD === */}
+      {activeSection === 'dashboard' && (
+        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in'>
+            {[
+                { label: 'Ventas Totales', value: `$${orders.reduce((acc, o) => acc + Number(o.contenidoTotal), 0).toLocaleString()}`, icon: HiOutlineChartBar, color: 'text-green-600', bg: 'bg-green-50' },
+                { label: 'Pedidos Pendientes', value: orders.filter(o => o.estadoId === 1).length, icon: HiOutlineShoppingBag, color: 'text-yellow-600', bg: 'bg-yellow-50' },
+                { label: 'Devoluciones', value: returnsList.filter(r => r.estadoId === 1).length, icon: HiFilter, color: 'text-red-600', bg: 'bg-red-50' },
+                { label: 'Clientes', value: users.filter(u => u.rolId !== 2).length, icon: HiOutlineUsers, color: 'text-blue-600', bg: 'bg-blue-50' },
+            ].map((stat, index) => (
+              <div key={index} className='bg-white rounded-xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow flex items-center justify-between'>
+                <div>
+                    <p className='text-gray-500 text-sm font-medium'>{stat.label}</p>
+                    <p className='text-3xl font-bold text-gray-800 mt-2'>{stat.value}</p>
+                </div>
+                <div className={`${stat.bg} ${stat.color} p-4 rounded-full`}>
+                    <stat.icon size={24} />
+                </div>
               </div>
-            </div>
-          )}
-
-          {(!orders || orders.length === 0) && (
-            <div className='bg-white rounded-lg p-6 border border-gray-200 text-center text-gray-500'>
-              <p>No hay pedidos recientes</p>
-            </div>
-          )}
+            ))}
         </div>
       )}
 
-      {/* Productos */}
-{activeSection === 'products' && (
-  <div>
-    <div className='flex justify-between items-center mb-4'>
-      <h2 className='text-xl font-bold'>Gestión de productos</h2>
-      <button onClick={() => setShowProductForm(true)} className='bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700'>+ Agregar producto</button>
-    </div>
-
-    {showProductForm && <div className='mb-6'><ProductForm product={editingProduct} onClose={handleCloseForm} /></div>}
-
-    <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
-      {(products || []).map(product => (
-        /* CAMBIO 1: Usar productoId como key */
-        <div key={product.productoId} className='bg-white rounded-lg border border-gray-200 p-4'>
-          {product.imagen && <img src={product.imagen} alt={product.nombre} className='w-full h-48 object-cover rounded-lg mb-3' />}
-          <h3 className='font-bold text-lg mb-2'>{product.nombre}</h3>
-          <p className='text-gray-600 text-sm mb-2 line-clamp-2'>{product.descripcion}</p>
-          
-          {/* CAMBIO 2: Cambiar precioBase por precio */}
-          <p className='text-cyan-600 font-bold mb-3'>
-            ${product.precio?.toLocaleString() || '0'}
-          </p>
-
-          <div className='flex gap-2'>
-            <button onClick={() => handleEditProduct(product)} className='flex-1 bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700 text-sm'>Editar</button>
-            
-            {/* CAMBIO 3: Usar productoId para eliminar */}
-            <button onClick={() => deleteProduct(product.productoId)} className='px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600'>
-              <HiX size={20} />
+      {/* === SECCIÓN PRODUCTOS === */}
+      {activeSection === 'products' && (
+        <div className="animate-fade-in">
+          <div className='flex flex-col sm:flex-row justify-between items-center mb-6 gap-4'>
+            <div className="relative w-full sm:w-96">
+                <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input 
+                    type="text" 
+                    placeholder="Buscar producto..." 
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none"
+                    value={productSearch}
+                    onChange={e => { setProductSearch(e.target.value); setProductPage(1); }}
+                />
+            </div>
+            <button onClick={() => { setEditingProduct(null); setShowProductForm(true); }} className='flex items-center gap-2 bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 shadow-sm transition-colors font-medium'>
+                <HiPlus /> Nuevo Producto
             </button>
           </div>
-        </div>
-      ))}
-      {(!products || products.length === 0) && <div className='col-span-full text-center py-12 text-gray-500'>No hay productos. Agrega tu primer producto.</div>}
-    </div>
-  </div>
-)}
 
-      {/* Pedidos - Tab Completa */}
-            {activeSection === 'orders' && (
-              <div>
-                <h2 className='text-xl font-bold mb-4'>Gestión de pedidos</h2>
-                <div className='space-y-4'>
-                  {(!orders || orders.length === 0) ? 
-                      <div className='text-center py-12 text-gray-500 bg-white rounded-lg border border-gray-200'>No hay pedidos aún</div> 
-                      : 
-                      (orders || []).map(order => (
-                          // Aquí deberías actualizar el componente <OrderCard /> también,
-                          // pero por ahora pasamos el objeto order con las props correctas.
-                          <OrderCard key={order.pedidoId} order={order} />
-                      ))
-                  }
+          {showProductForm && (
+              <div className="mb-8 p-4 bg-white rounded-lg border border-cyan-100 shadow-sm">
+                  <ProductForm product={editingProduct} onClose={() => { setShowProductForm(false); setEditingProduct(null); }} />
+              </div>
+          )}
+
+          <div className='grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6'>
+            {paginatedProducts.map(p => (
+              <div key={p.productoId} className='bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all group'>
+                <div className="h-48 bg-gray-100 relative overflow-hidden">
+                    {p.imagen ? <img src={p.imagen} className='w-full h-full object-cover group-hover:scale-105 transition-transform duration-300' alt=""/> : <div className="flex h-full items-center justify-center text-gray-400">Sin imagen</div>}
+                </div>
+                <div className="p-4">
+                    <h3 className='font-bold text-gray-800 truncate mb-1'>{p.nombre}</h3>
+                    <p className='text-cyan-600 font-bold text-lg mb-3'>${Number(p.precio).toFixed(2)}</p>
+                    <div className='flex gap-2 pt-2 border-t border-gray-100'>
+                        <button onClick={() => { setEditingProduct(p); setShowProductForm(true); }} className='flex-1 py-2 text-sm font-medium text-gray-600 bg-gray-50 rounded hover:bg-gray-100 transition-colors'>Editar</button>
+                        <button onClick={() => deleteProduct(p.productoId)} className='px-3 text-red-500 bg-red-50 rounded hover:bg-red-100 transition-colors'><HiX /></button>
+                    </div>
                 </div>
               </div>
-            )}
-
-            {activeSection === 'returns' && (
-              <div className='bg-white rounded-lg border border-gray-200 p-6'>
-                <h2 className='text-xl font-bold mb-4'>Solicitudes de devolución</h2>
-                <div className='space-y-3'>
-                  {returnsList.length === 0 ? (
-                      <p className="text-gray-500">No hay solicitudes pendientes.</p>
-                  ) : (
-                      returnsList.map(dev => (
-                        <div key={dev.devolucionId} className='p-4 bg-gray-50 rounded-lg border border-gray-200'>
-                          <div className='flex justify-between items-start mb-2'>
-                            <div>
-                                <p className='font-semibold'>Devolución #{dev.devolucionId}</p>
-                                <p className='text-sm text-gray-600'>Pedido (Factura) ID: {dev.facturaId}</p>
-                                <p className='text-sm text-gray-600 font-medium'>Motivo: {dev.motivo}</p>
-                            </div>
-                            <span className={`px-3 py-1 rounded-full text-sm font-bold ${
-                                dev.estadoId === 1 ? 'bg-yellow-100 text-yellow-800' : 
-                                dev.estadoId === 2 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                            }`}>
-                                {dev.estadoId === 1 ? 'PENDIENTE' : dev.estadoId === 2 ? 'APROBADO' : 'RECHAZADO'}
-                            </span>
-                          </div>
-
-                          {/* Solo mostrar botones si está pendiente (Estado 1) */}
-                          {dev.estadoId === 1 && (
-                              <div className='flex gap-2 mt-3'>
-                                <button 
-                                    onClick={() => handleReturnAction(dev.devolucionId, 2)}
-                                    className='px-4 py-1 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700'
-                                >
-                                    Aprobar
-                                </button>
-                                <button 
-                                    onClick={() => handleReturnAction(dev.devolucionId, 3)}
-                                    className='px-4 py-1 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700'
-                                >
-                                    Rechazar
-                                </button>
-                              </div>
-                          )}
-                        </div>
-                      ))
-                  )}
-                </div>
-              </div>
-            )}
-
-      {/* Usuarios */}
-      {activeSection === 'users' && (
-        <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
-          {/* Lista */}
-          <div className='lg:col-span-2 bg-white rounded-lg p-6 border border-gray-200'>
-            <div className='flex items-center justify-between mb-4'>
-              <h2 className='text-xl font-bold'>Usuarios registrados</h2>
-              <div className='flex gap-2'>
-                <input className='border rounded px-3 py-2' placeholder='Buscar por nombre o correo' value={search} onChange={e => setSearch(e.target.value)} />
-                <button className='px-3 py-2 border rounded' onClick={() => { setSearch(''); fetchUsers(); }}>Limpiar</button>
-              </div>
-            </div>
-
-            {loadingUsers ? (
-              <p className='text-gray-500'>Cargando usuarios...</p>
-            ) : filteredUsers.length === 0 ? (
-              <p className='text-gray-500'>No hay usuarios registrados.</p>
-            ) : (
-              <table className='w-full text-sm'>
-                <thead>
-                  <tr className='border-b'>
-                    <th className='text-left py-2'>ID</th>
-                    <th className='text-left py-2'>Nombre</th>
-                    <th className='text-left py-2'>Correo</th>
-                    <th className='text-left py-2'>Rol</th>
-                    <th className='text-right py-2'>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.map(u => (
-                    <tr key={u.usuarioId} className='border-b last:border-0'>
-                      <td className='py-2'>{u.usuarioId}</td>
-                      <td className='py-2'>{u.nombre} {u.apellido}</td>
-                      <td className='py-2'>{u.correoElectronico}</td>
-                      <td className='py-2'>{u.rolId === 2 ? 'ADMIN' : 'USER'}</td>
-                      <td className='py-2 text-right'>
-                        {/* aqui tenemos que arreglar despues con que ID se quedan los roles  */}
-                        <button onClick={() => startEditUser(u)} className='px-3 py-1 mr-2 bg-blue-600 text-white rounded'>Editar</button>
-                        <button onClick={() => { if (confirm('Eliminar usuario?')) deleteUser(u.usuarioId); }} className='px-3 py-1 bg-red-600 text-white rounded'>Eliminar</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+            ))}
           </div>
+          <Pagination totalItems={filteredProducts.length} itemsPerPage={ITEMS_PER_PAGE} currentPage={productPage} onPageChange={setProductPage} />
+        </div>
+      )}
 
-          {/* Formulario crear/editar */}
-          <div className='bg-white rounded-lg p-6 border border-gray-200'>
-            <h2 className='text-xl font-bold mb-4'>{editingUserId ? 'Editar usuario' : 'Crear nuevo usuario'}</h2>
+      {/* === SECCIÓN PEDIDOS (MEJORADA) === */}
+      {activeSection === 'orders' && (
+        <div className='bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in'>
+            <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center flex-wrap gap-4">
+                <h2 className='font-bold text-gray-700 text-lg'>Gestión de Pedidos</h2>
+                <div className="relative">
+                    <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input 
+                        className="pl-10 pr-4 py-2 border rounded-lg text-sm w-64 focus:ring-2 focus:ring-cyan-500 outline-none" 
+                        placeholder="Buscar por ID o Cliente..." 
+                        value={orderSearch}
+                        onChange={e => { setOrderSearch(e.target.value); setOrderPage(1); }}
+                    />
+                </div>
+            </div>
+            
+            <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                    <thead className="bg-gray-50 text-gray-600 uppercase font-semibold border-b">
+                        <tr>
+                            <th className="px-6 py-4">ID</th>
+                            <th className="px-6 py-4">Cliente</th>
+                            <th className="px-6 py-4">Fecha</th>
+                            <th className="px-6 py-4">Total</th>
+                            <th className="px-6 py-4">Estado</th>
+                            <th className="px-6 py-4 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {paginatedOrders.map(order => (
+                            <tr key={order.pedidoId} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-6 py-4 font-bold text-gray-900">#{order.pedidoId}</td>
+                                <td className="px-6 py-4">
+                                    <div className="font-medium text-gray-900">{order.usuario?.nombre} {order.usuario?.apellido}</div>
+                                    <div className="text-xs text-gray-500">{order.usuario?.correoElectronico}</div>
+                                </td>
+                                <td className="px-6 py-4 text-gray-500">{new Date(order.fechaCreacion).toLocaleDateString()}</td>
+                                <td className="px-6 py-4 font-mono font-bold text-gray-900">${Number(order.contenidoTotal).toFixed(2)}</td>
+                                <td className="px-6 py-4">
+                                    {/* SELECTOR DE ESTADO */}
+                                    <select 
+                                        value={order.estadoId} 
+                                        onChange={(e) => handleOrderStatusChange(order.pedidoId, e.target.value)}
+                                        className={`block w-full py-1 pl-2 pr-6 text-xs font-semibold rounded-full border-0 ring-1 ring-inset focus:ring-2 focus:ring-cyan-600 sm:text-sm sm:leading-6 cursor-pointer ${
+                                            order.estadoId === 1 ? 'bg-yellow-50 text-yellow-800 ring-yellow-600/20' : 
+                                            order.estadoId === 2 ? 'bg-green-50 text-green-700 ring-green-600/20' :
+                                            order.estadoId === 5 ? 'bg-red-50 text-red-700 ring-red-600/20' :
+                                            'bg-gray-50 text-gray-700 ring-gray-600/20'
+                                        }`}
+                                    >
+                                        <option value={1}>Pendiente</option>
+                                        <option value={2}>Pagado / Proceso</option>
+                                        <option value={3}>Enviado</option>
+                                        <option value={4}>Entregado</option>
+                                        <option value={5}>Cancelado</option>
+                                    </select>
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                    <div className="flex justify-center gap-2">
+                                        <button 
+                                            onClick={() => handleOpenOrderDetails(order)}
+                                            className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                                            title="Ver Detalles Completos"
+                                        >
+                                            <HiEye size={18} />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleDeleteOrder(order.pedidoId)}
+                                            className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                                            title="Eliminar Pedido"
+                                        >
+                                            <HiTrash size={18} />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <Pagination totalItems={filteredOrders.length} itemsPerPage={ITEMS_PER_PAGE} currentPage={orderPage} onPageChange={setOrderPage} />
+        </div>
+      )}
 
-            <form className='space-y-4' onSubmit={handleUserSubmit}>
-              <div>
-                <label className='block text-sm font-semibold mb-1'>Nombre</label>
-                <input required className='w-full border rounded-lg px-3 py-2' value={userForm.nombre} onChange={e => setUserForm({ ...userForm, nombre: e.target.value })} />
-              </div>
+      {/* === SECCIÓN DEVOLUCIONES === */}
+      {activeSection === 'returns' && (
+        <div className='bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in'>
+            <div className="flex border-b border-gray-200">
+                {['pending', 'history'].map(filter => (
+                    <button 
+                        key={filter}
+                        onClick={() => { setReturnFilter(filter); setReturnPage(1); }}
+                        className={`flex-1 py-4 text-sm font-medium transition-colors ${returnFilter === filter ? 'bg-white text-cyan-700 border-b-2 border-cyan-600' : 'bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+                    >
+                        {filter === 'pending' ? `Pendientes (${returnsList.filter(r=>r.estadoId===1).length})` : 'Historial'}
+                    </button>
+                ))}
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                    <thead className="bg-gray-50 text-gray-600 uppercase font-semibold">
+                        <tr>
+                            <th className="px-6 py-4">Producto</th>
+                            <th className="px-6 py-4">Cliente</th>
+                            <th className="px-6 py-4">Detalles</th>
+                            <th className="px-6 py-4">Estado</th>
+                            <th className="px-6 py-4 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {paginatedReturns.length === 0 ? <tr><td colSpan="5" className="p-8 text-center text-gray-400">No hay solicitudes</td></tr> :
+                        paginatedReturns.map(dev => (
+                            <tr key={dev.devolucionId} className="hover:bg-gray-50">
+                                <td className="px-6 py-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                                            {dev.variante?.producto?.imagen ? <img src={dev.variante?.producto?.imagen} className="w-full h-full object-cover" alt=""/> : <div className="w-full h-full bg-gray-200" />}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-gray-900">{dev.variante?.producto?.nombre}</p>
+                                            <p className="text-xs text-gray-500">Factura #{dev.factura?.facturaId}</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <div className="font-medium text-gray-900">{getUserName(dev.usuarioCreaId)}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <div className="max-w-xs">
+                                        <p className="text-gray-900 truncate" title={dev.motivo}>{dev.motivo}</p>
+                                        <p className="text-xs text-gray-400 mt-1">{new Date(dev.fechaDevolucion).toLocaleDateString()}</p>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${dev.estadoId===1?'bg-yellow-100 text-yellow-800':dev.estadoId===2?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}`}>
+                                        {dev.estadoId===1?'PENDIENTE':dev.estadoId===2?'APROBADO':'RECHAZADO'}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <div className="flex justify-center gap-2">
+                                        <button onClick={() => handleOpenInvoiceFromReturn(dev)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors" title="Ver Factura"><HiDocumentText size={18}/></button>
+                                        {returnFilter === 'pending' && (
+                                            <>
+                                                <button onClick={() => handleReturnAction(dev.devolucionId, 2)} className="p-2 text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors" title="Aprobar"><HiCheck size={18}/></button>
+                                                <button onClick={() => handleReturnAction(dev.devolucionId, 3)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors" title="Rechazar"><HiX size={18}/></button>
+                                            </>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <Pagination totalItems={filteredReturns.length} itemsPerPage={ITEMS_PER_PAGE} currentPage={returnPage} onPageChange={setReturnPage} />
+        </div>
+      )}
 
-              <div>
-                <label className='block text-sm font-semibold mb-1'>Apellido</label>
-                <input required className='w-full border rounded-lg px-3 py-2' value={userForm.apellido} onChange={e => setUserForm({ ...userForm, apellido: e.target.value })} />
-              </div>
-
-              <div>
-                <label className='block text-sm font-semibold mb-1'>Correo electrónico</label>
-                <input required type='email' className='w-full border rounded-lg px-3 py-2' value={userForm.correoElectronico} onChange={e => setUserForm({ ...userForm, correoElectronico: e.target.value })} />
-              </div>
-
-              <div>
-                <label className='block text-sm font-semibold mb-1'>Teléfono</label>
-                <input className='w-full border rounded-lg px-3 py-2' value={userForm.telefono} onChange={e => setUserForm({ ...userForm, telefono: e.target.value })} />
-              </div>
-
-              <div>
-                <label className='block text-sm font-semibold mb-1'>Contraseña</label>
-                <input type='password' className='w-full border rounded-lg px-3 py-2' value={userForm.contrasenaFriada} onChange={e => setUserForm({ ...userForm, contrasenaFriada: e.target.value })} placeholder={editingUserId ? 'Dejar vacío para no cambiar' : ''} />
-              </div>
-
-              <div>
-                <label className='block text-sm font-semibold mb-1'>Rol</label>
-                <select className='w-full border rounded-lg px-3 py-2' value={userForm.rolId} onChange={e => setUserForm({ ...userForm, rolId: Number(e.target.value) })}>
-                  {/* aqui tenemos que ver despues con que ID se quedan los roles  */}
-                  <option value={1}>Usuario</option>
-                  <option value={2}>Administrador</option>
+      {/* === SECCIÓN USUARIOS === */}
+      {activeSection === 'users' && (
+        <div className='grid grid-cols-1 xl:grid-cols-3 gap-8 animate-fade-in'>
+          <div className='xl:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden'>
+             <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <h2 className='font-bold text-gray-800 text-lg'>Base de Usuarios</h2>
+                <div className="relative w-full sm:w-64">
+                    <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input className='w-full pl-10 pr-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 outline-none' placeholder='Buscar usuario...' value={userSearch} onChange={e => {setUserSearch(e.target.value); setUserPage(1)}} />
+                </div>
+             </div>
+             <div className="overflow-x-auto">
+                <table className='w-full text-sm text-left'>
+                    <thead className="bg-gray-50 text-gray-600 uppercase font-semibold">
+                        <tr><th className="px-6 py-3">Usuario</th><th className="px-6 py-3">Rol</th><th className="px-6 py-3 text-right">Acción</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {paginatedUsers.map(u => (
+                            <tr key={u.usuarioId} className="hover:bg-gray-50">
+                                <td className="px-6 py-3">
+                                    <div className="font-medium text-gray-900">{u.nombre} {u.apellido}</div>
+                                    <div className="text-xs text-gray-500">{u.correoElectronico}</div>
+                                </td>
+                                <td className="px-6 py-3">
+                                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${u.rolId === 2 ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                                        {u.rolId === 2 ? 'ADMINISTRADOR' : 'CLIENTE'}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-3 text-right">
+                                    <button onClick={() => { setEditingUserId(u.usuarioId); setUserForm({...u, contrasenaFriada: '', rolId: u.rolId??1}); }} className="text-cyan-600 hover:text-cyan-800 font-medium mr-4">Editar</button>
+                                    <button onClick={() => { if(confirm('Eliminar?')) deleteUser(u.usuarioId) }} className="text-red-500 hover:text-red-700 font-medium">Borrar</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+             </div>
+             <Pagination totalItems={filteredUsers.length} itemsPerPage={ITEMS_PER_PAGE} currentPage={userPage} onPageChange={setUserPage} />
+          </div>
+          
+          <div className='bg-white p-6 border border-gray-200 rounded-xl shadow-sm h-fit sticky top-6'>
+            <h2 className='font-bold text-gray-800 text-lg mb-6'>{editingUserId?'Editar Usuario':'Crear Usuario'}</h2>
+            <form onSubmit={handleUserSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <input required className='border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-500 outline-none' placeholder="Nombre" value={userForm.nombre} onChange={e=>setUserForm({...userForm, nombre:e.target.value})} />
+                    <input required className='border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-500 outline-none' placeholder="Apellido" value={userForm.apellido} onChange={e=>setUserForm({...userForm, apellido:e.target.value})} />
+                </div>
+                <input required type="email" className='w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-500 outline-none' placeholder="Correo Electrónico" value={userForm.correoElectronico} onChange={e=>setUserForm({...userForm, correoElectronico:e.target.value})} />
+                <input className='w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-500 outline-none' placeholder="Teléfono" value={userForm.telefono} onChange={e=>setUserForm({...userForm, telefono:e.target.value})} />
+                <input type="password" className='w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-500 outline-none' placeholder="Contraseña (opcional al editar)" value={userForm.contrasenaFriada} onChange={e=>setUserForm({...userForm, contrasenaFriada:e.target.value})} />
+                <select className='w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-500 outline-none bg-white' value={userForm.rolId} onChange={e=>setUserForm({...userForm, rolId:Number(e.target.value)})}>
+                    <option value={1}>Cliente</option><option value={2}>Administrador</option>
                 </select>
-              </div>
-
-              <div className='flex gap-2'>
-                <button type='submit' className='w-full bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700'>{editingUserId ? 'Actualizar' : 'Guardar usuario'}</button>
-                {editingUserId && <button type='button' onClick={() => { setEditingUserId(null); setUserForm({ nombre:'', apellido:'', correoElectronico:'', telefono:'', contrasenaFriada:'', rolId:1 }); }} className='px-4 py-2 border rounded-lg'>Cancelar</button>}
-              </div>
+                <div className="flex gap-3 pt-2">
+                    <button type="submit" className='flex-1 bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700 transition-colors font-medium'>Guardar</button>
+                    {editingUserId && <button type='button' onClick={() => { setEditingUserId(null); setUserForm({ nombre:'', apellido:'', correoElectronico:'', telefono:'', contrasenaFriada:'', rolId:1 }); }} className='px-4 border rounded-lg hover:bg-gray-50 text-gray-600'>Cancelar</button>}
+                </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* --- MODAL DETALLE DE PEDIDO --- */}
+      {showOrderDetails && selectedOrder && (
+          <div 
+             className="fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-all"
+             style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }} 
+          >
+              <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto animate-fade-in">
+                  <div className="flex justify-between items-center p-6 border-b border-gray-100">
+                      <div>
+                          <h3 className="text-xl font-bold text-gray-800">Pedido #{selectedOrder.pedidoId}</h3>
+                          <p className="text-sm text-gray-500">{new Date(selectedOrder.fechaCreacion).toLocaleString()}</p>
+                      </div>
+                      <button onClick={() => setShowOrderDetails(false)} className="text-gray-400 hover:text-red-500 transition-colors"><HiX size={28}/></button>
+                  </div>
+
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Cliente */}
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                          <h4 className="font-bold text-gray-700 mb-2 uppercase text-xs tracking-wider">Información del Cliente</h4>
+                          <p className="font-medium text-lg text-gray-900">{selectedOrder.usuario?.nombre} {selectedOrder.usuario?.apellido}</p>
+                          <p className="text-gray-600">{selectedOrder.usuario?.correoElectronico}</p>
+                          <p className="text-gray-600">{selectedOrder.usuario?.telefono || "Sin teléfono"}</p>
+                      </div>
+                      
+                      {/* Envío */}
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                          <h4 className="font-bold text-gray-700 mb-2 uppercase text-xs tracking-wider">Datos de Envío</h4>
+                          <p className="text-gray-800 font-medium">{selectedOrder.transporte || "Transporte no especificado"}</p>
+                          <p className="text-gray-600 text-sm mt-1">{selectedOrder.direccionEnvio || "Recogida en tienda / Sin dirección"}</p>
+                      </div>
+                  </div>
+
+                  {/* Productos */}
+                  <div className="px-6 py-2">
+                      <h4 className="font-bold text-gray-700 mb-4 uppercase text-xs tracking-wider">Productos Comprados</h4>
+                      <div className="border rounded-lg overflow-hidden">
+                          <table className="w-full text-sm text-left">
+                              <thead className="bg-gray-50 text-gray-600 font-medium border-b">
+                                  <tr><th className="px-4 py-3">Producto</th><th className="px-4 py-3 text-center">Cant.</th><th className="px-4 py-3 text-right">Precio</th><th className="px-4 py-3 text-right">Total</th></tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                  {selectedOrder.detalles?.map((item, idx) => (
+                                      <tr key={idx}>
+                                          <td className="px-4 py-3">
+                                              <p className="font-medium text-gray-900">{item.variante?.producto?.nombre || "Producto eliminado"}</p>
+                                              <p className="text-xs text-gray-500">{item.variante?.nombre}</p>
+                                          </td>
+                                          <td className="px-4 py-3 text-center">{item.cantidad}</td>
+                                          <td className="px-4 py-3 text-right">${Number(item.precio).toFixed(2)}</td>
+                                          <td className="px-4 py-3 text-right font-bold text-gray-900">${(item.precio * item.cantidad).toFixed(2)}</td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                      <div className="flex justify-end mt-4">
+                           <div className="text-right">
+                               <p className="text-sm text-gray-500">Total a Pagar</p>
+                               <p className="text-2xl font-bold text-cyan-600">${Number(selectedOrder.contenidoTotal).toFixed(2)}</p>
+                           </div>
+                      </div>
+                  </div>
+
+                  {/* Acciones del Modal */}
+                  <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-xl">
+                      <button 
+                          onClick={() => handleDeleteOrder(selectedOrder.pedidoId)} 
+                          className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 flex items-center gap-2 font-medium"
+                      >
+                          <HiTrash /> Eliminar Pedido
+                      </button>
+                      
+                      {selectedOrder.factura ? (
+                          <button 
+                              onClick={() => handleOpenInvoice(selectedOrder)} 
+                              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black flex items-center gap-2 font-medium"
+                          >
+                              <HiDocumentText /> Ver Factura
+                          </button>
+                      ) : (
+                          <span className="px-4 py-2 text-gray-400 text-sm italic flex items-center">Sin factura generada</span>
+                      )}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* --- MODAL DE FACTURA (POPUP) --- */}
+      {showInvoice && selectedOrderForInvoice && (
+        <div 
+            className="fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-all"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }} 
+        >
+            <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fade-in">
+                <div className="flex justify-between items-center p-4 border-b bg-gray-50">
+                    <h3 className="font-bold text-lg text-gray-800">Factura #{selectedOrderForInvoice.factura?.facturaId}</h3>
+                    <button onClick={() => setShowInvoice(false)} className="text-gray-400 hover:text-red-500 transition-colors"><HiX size={24}/></button>
+                </div>
+                
+                <div className="p-8 print:p-0" id="invoice-content">
+                    {/* ... (Contenido de factura igual al anterior) ... */}
+                    <div className="flex justify-between items-start mb-8 border-b pb-6">
+                        <div>
+                            <h2 className="text-2xl font-black text-gray-800 tracking-tight">INNOVA ARTE</h2>
+                            <p className="text-sm text-gray-500 mt-1">RUC: 0999999999001</p>
+                            <p className="text-sm text-gray-500">Manta, Ecuador</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-xs font-bold text-gray-400 tracking-wider uppercase">FECHA DE EMISIÓN</p>
+                            <p className="text-lg font-mono text-gray-900">{new Date(selectedOrderForInvoice.fechaCreacion).toLocaleDateString()}</p>
+                        </div>
+                    </div>
+
+                    <div className="mb-8 p-5 bg-gray-50 rounded-lg border border-gray-100">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <p className="text-xs font-bold text-gray-400 uppercase mb-1">Facturar a</p>
+                                <p className="font-bold text-gray-800">{selectedOrderForInvoice.usuario?.nombre} {selectedOrderForInvoice.usuario?.apellido}</p>
+                                <p className="text-sm text-gray-600">{selectedOrderForInvoice.usuario?.correoElectronico}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xs font-bold text-gray-400 uppercase mb-1">Enviar a</p>
+                                <p className="text-sm text-gray-600 max-w-xs ml-auto">{selectedOrderForInvoice.direccionEnvio || 'Dirección no registrada'}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <table className="w-full text-sm mb-6">
+                        <thead>
+                            <tr className="border-b-2 border-gray-100 text-gray-500 uppercase text-xs tracking-wider">
+                                <th className="text-left py-3">Descripción</th>
+                                <th className="text-center py-3">Cant.</th>
+                                <th className="text-right py-3">P. Unit</th>
+                                <th className="text-right py-3">Importe</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {selectedOrderForInvoice.detalles?.map((item, i) => (
+                                <tr key={i}>
+                                    <td className="py-4">
+                                        <p className="font-medium text-gray-900">{item.variante?.producto?.nombre || 'Producto'} <span className="text-xs text-gray-400">({item.variante?.nombre})</span></p>
+                                    </td>
+                                    <td className="py-4 text-center text-gray-600">{item.cantidad}</td>
+                                    <td className="py-4 text-right text-gray-600">${Number(item.precio).toFixed(2)}</td>
+                                    <td className="py-4 text-right font-bold text-gray-900">${(item.precio * item.cantidad).toFixed(2)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                    <div className="flex justify-end border-t border-gray-100 pt-6">
+                        <div className="w-64 space-y-3">
+                            <div className="flex justify-between text-gray-500 text-sm">
+                                <span>Subtotal</span>
+                                <span>${Number(selectedOrderForInvoice.factura?.subtotal || (selectedOrderForInvoice.contenidoTotal / 1.15)).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-gray-500 text-sm">
+                                <span>IVA (15%)</span>
+                                <span>${Number(selectedOrderForInvoice.factura?.iva || (selectedOrderForInvoice.contenidoTotal - (selectedOrderForInvoice.contenidoTotal / 1.15))).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-xl font-bold text-gray-900 border-t border-gray-200 pt-3">
+                                <span>Total</span>
+                                <span className="text-cyan-600">${Number(selectedOrderForInvoice.contenidoTotal).toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-4 border-t bg-gray-50 flex justify-end gap-3 rounded-b-lg">
+                    <button onClick={() => setShowInvoice(false)} className="px-4 py-2 border bg-white rounded-lg hover:bg-gray-50 text-gray-700 font-medium transition-colors">Cerrar</button>
+                    <button onClick={() => window.print()} className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black flex items-center gap-2 font-medium transition-colors">
+                        <HiPrinter /> Imprimir Recibo
+                    </button>
+                </div>
+            </div>
         </div>
       )}
     </div>
