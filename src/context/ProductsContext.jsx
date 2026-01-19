@@ -1,4 +1,5 @@
 /*import { createContext, useContext, useState, useEffect } from 'react';
+import { notifySuccess, notifyError } from '../utils/notifications';
 
 const ProductsContext = createContext();
 
@@ -178,11 +179,11 @@ export const ProductsProvider = ({ children }) => {
             if (!id) return;
             await productsAPI.delete(id);
             setProducts(products.filter(p => p.productoId !== id));
-            alert("Producto eliminado exitosamente");
+            notifySuccess("Producto eliminado exitosamente");
         } catch (error) {
             console.error('Error deleting product:', error);
             const errorMessage = error.response?.data?.message || "Error al eliminar el producto";
-            alert(errorMessage);
+            notifyError(errorMessage);
             throw error;
         }
     };

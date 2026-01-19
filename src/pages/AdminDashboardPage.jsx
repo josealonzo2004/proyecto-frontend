@@ -5,6 +5,7 @@ import { useProducts } from '../context/ProductsContext';
 import { useOrders } from '../context/OrdersContext';
 import { useUsers } from '../context/UsersContext';
 import { devolucionesAPI, pedidosAPI } from "../services/api"; // Importamos pedidosAPI
+import { notifySuccess, notifyError, notifyWarning, confirmAction } from '../utils/notifications';
 
 // ICONOS
 import { 
@@ -111,24 +112,28 @@ export const AdminDashboardPage = () => {
           await pedidosAPI.update(orderId, { estadoId: Number(newStatus) });
           // Recargamos los pedidos para ver el cambio
           if(fetchOrders) await fetchOrders(); 
-          alert("Estado actualizado correctamente");
+          notifySuccess("Estado actualizado correctamente");
       } catch (error) {
           console.error(error);
-          alert("Error al actualizar el estado");
+          notifyError("Error al actualizar el estado");
       }
   };
 
   const handleDeleteOrder = async (orderId) => {
-      if(!confirm("¿ESTÁS SEGURO? Eliminar un pedido es irreversible.")) return;
-      try {
-          await pedidosAPI.delete(orderId);
-          if(fetchOrders) await fetchOrders();
-          setShowOrderDetails(false); // Cerrar modal si estaba abierto
-          alert("Pedido eliminado");
-      } catch (error) {
-          console.error(error);
-          alert("Error al eliminar pedido");
-      }
+      confirmAction(
+          "¿ESTÁS SEGURO? Eliminar un pedido es irreversible.",
+          async () => {
+              try {
+                  await pedidosAPI.delete(orderId);
+                  if(fetchOrders) await fetchOrders();
+                  setShowOrderDetails(false); // Cerrar modal si estaba abierto
+                  notifySuccess("Pedido eliminado");
+              } catch (error) {
+                  console.error(error);
+                  notifyError("Error al eliminar pedido");
+              }
+          }
+      );
   };
 
   const handleOpenOrderDetails = (order) => {
@@ -138,7 +143,10 @@ export const AdminDashboardPage = () => {
 
   // --- LÓGICA FACTURA ---
   const handleOpenInvoice = (order) => {
-      if (!order?.factura) return alert("Este pedido no tiene factura generada.");
+      if (!order?.factura) {
+          notifyWarning("Este pedido no tiene factura generada.");
+          return;
+      }
       setSelectedOrderForInvoice(order);
       setShowInvoice(true);
       // Si abrimos factura desde el detalle, podemos mantener el detalle abierto o cerrarlo.
@@ -149,16 +157,23 @@ export const AdminDashboardPage = () => {
       const facturaId = devolucion.factura?.facturaId || devolucion.facturaId;
       const order = orders.find(o => (o.factura?.facturaId === facturaId) || (o.facturaId === facturaId));
       if (order) handleOpenInvoice(order);
-      else alert("Factura no encontrada en memoria.");
+      else notifyWarning("Factura no encontrada en memoria.");
   };
 
   const handleReturnAction = async (id, nuevoEstadoId) => {
     const accion = nuevoEstadoId === 2 ? "APROBAR" : "RECHAZAR";
-    if(!confirm(`¿${accion} esta solicitud?`)) return;
-    try {
-        await devolucionesAPI.update(id, { estadoId: nuevoEstadoId });
-        fetchReturns(); 
-    } catch (error) { alert("Error al actualizar"); }
+    confirmAction(
+        `¿${accion} esta solicitud?`,
+        async () => {
+            try {
+                await devolucionesAPI.update(id, { estadoId: nuevoEstadoId });
+                fetchReturns();
+                notifySuccess(`Solicitud ${nuevoEstadoId === 2 ? 'aprobada' : 'rechazada'} correctamente`);
+            } catch (error) {
+                notifyError("Error al actualizar");
+            }
+        }
+    );
   };
 
   const handleUserSubmit = async (e) => { 
@@ -171,8 +186,10 @@ export const AdminDashboardPage = () => {
         setUserForm({ nombre: '', apellido: '', correoElectronico: '', telefono: '', contrasenaFriada: '', rolId: 1 });
         setEditingUserId(null);
         await fetchUsers();
-        alert('Usuario guardado');
-      } catch (err) { alert(err.message); }
+        notifySuccess('Usuario guardado correctamente');
+      } catch (err) { 
+          notifyError(err.message); 
+      }
   };
 
   const getUserName = (id) => {
@@ -480,7 +497,12 @@ export const AdminDashboardPage = () => {
                                 </td>
                                 <td className="px-6 py-3 text-right">
                                     <button onClick={() => { setEditingUserId(u.usuarioId); setUserForm({...u, contrasenaFriada: '', rolId: u.rolId??1}); }} className="text-cyan-600 hover:text-cyan-800 font-medium mr-4">Editar</button>
-                                    <button onClick={() => { if(confirm('Eliminar?')) deleteUser(u.usuarioId) }} className="text-red-500 hover:text-red-700 font-medium">Borrar</button>
+                                    <button onClick={() => { 
+                                        confirmAction(
+                                            '¿Eliminar usuario?',
+                                            () => deleteUser(u.usuarioId)
+                                        );
+                                    }} className="text-red-500 hover:text-red-700 font-medium">Borrar</button>
                                 </td>
                             </tr>
                         ))}

@@ -3,6 +3,7 @@ import { ProductCard } from '../components/products/ProductCard';
 import { useCart } from '../context/CartContext';
 import { useProducts } from '../context/ProductsContext';
 import { HiOutlineMagnifyingGlass } from 'react-icons/hi2';
+import { notifySuccess } from '../utils/notifications';
 
 export const ProductsPage = () => {
     const { addToCart } = useCart();
@@ -76,7 +77,7 @@ export const ProductsPage = () => {
                                 addToCart(product, variantToAdd, null); 
 
                                 // 3. Avisar al usuario
-                                alert("¡Producto agregado al carrito correctamente!");
+                                notifySuccess("¡Producto agregado al carrito!");
                             }}
                         />
                     );

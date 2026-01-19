@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { HiArrowLeft, HiPrinter, HiCheckCircle } from 'react-icons/hi';
 import { Link } from 'react-router-dom';
 import { direccionesAPI } from '../services/api';
+import { notifyError } from '../utils/notifications';
 
 export const CheckoutPage = () => {
     // 1. Hooks personalizados
@@ -102,7 +103,7 @@ export const CheckoutPage = () => {
 
             } catch (error) {
                 console.error("Error en checkout:", error);
-                alert("Hubo un error al procesar tu pedido. Por favor intenta de nuevo.");
+                notifyError("Hubo un error al procesar tu pedido. Por favor intenta de nuevo.");
                 setIsSubmitting(false); // Desbloquear solo si hubo error
             }
         }

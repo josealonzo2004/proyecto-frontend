@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { HiOutlineShoppingCart, HiArrowLeft } from 'react-icons/hi';
 import { useCart } from '../context/CartContext';
 import { useProducts } from '../context/ProductsContext';
+import { notifySuccess, notifyError, notifyWarning } from '../utils/notifications';
 
 export const ProductDetail = () => {
     const { id } = useParams();
@@ -70,7 +71,7 @@ export const ProductDetail = () => {
 
     const handleAddToCart = async () => {
         if (!selectedVariant) {
-            alert('Por favor selecciona una variante (ej: color, talla) o Estándar.');
+            notifyWarning('Por favor selecciona una variante (ej: color, talla) o Estándar.');
             return;
         }
 
@@ -80,7 +81,7 @@ export const ProductDetail = () => {
                 archivoBase64 = await convertFileToBase64(customizationFile);
             } catch (error) {
                 console.error('Error al convertir archivo:', error);
-                alert('Error al procesar el archivo');
+                notifyError('Error al procesar el archivo');
                 return;
             }
         }
@@ -97,7 +98,7 @@ export const ProductDetail = () => {
         }
         
         // 5. CORRECCIÓN: Aviso de éxito
-        alert('¡Producto agregado al carrito exitosamente!');
+        notifySuccess('¡Producto agregado al carrito exitosamente!');
     };
 
     const handleBuyNow = async () => {

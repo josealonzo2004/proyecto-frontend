@@ -9,6 +9,7 @@ import { ProductsProvider } from "./context/ProductsContext";
 import { OrdersProvider } from "./context/OrdersContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { UsersProvider } from "./context/UsersContext";
+import { Toaster } from 'react-hot-toast';
 
 try {
   const rootElement = document.getElementById('root');
@@ -25,6 +26,12 @@ try {
             <OrdersProvider>
               <CartProvider>
                 <RouterProvider router={router}/>
+                <Toaster 
+                  position="bottom-right"
+                  toastOptions={{
+                    className: 'font-sans',
+                  }}
+                />
               </CartProvider>
             </OrdersProvider>
           </ProductsProvider>

@@ -4,7 +4,9 @@ import { useAuth } from '../context/AuthContext';
 // IMPORTACIÓN DE API
 import { direccionesAPI, pedidosAPI, devolucionesAPI } from "../services/api"; 
 // IMPORTACIÓN DE ICONOS
-import { HiPencil, HiTrash, HiX, HiReply, HiExclamationCircle, HiUpload } from 'react-icons/hi'; 
+import { HiPencil, HiTrash, HiX, HiReply, HiExclamationCircle, HiUpload } from 'react-icons/hi';
+// IMPORTACIÓN DE NOTIFICACIONES
+import { notifySuccess, notifyError, notifyWarning, confirmAction } from '../utils/notifications'; 
 
 export const ProfilePage = () => {
     const { user, logout } = useAuth();
@@ -80,15 +82,19 @@ export const ProfilePage = () => {
 
     // --- Lógica Direcciones ---
     const handleDeleteAddress = async (id) => {
-        if (window.confirm('¿Estás seguro de que quieres eliminar esta dirección?')) {
-            try {
-                await direccionesAPI.delete(id);
-                setMisDirecciones(misDirecciones.filter(dir => dir.direccionId !== id));
-            } catch (error) {
-                console.error(error);
-                alert("No se pudo eliminar");
+        confirmAction(
+            '¿Estás seguro de que quieres eliminar esta dirección?',
+            async () => {
+                try {
+                    await direccionesAPI.delete(id);
+                    setMisDirecciones(misDirecciones.filter(dir => dir.direccionId !== id));
+                    notifySuccess('Dirección eliminada correctamente');
+                } catch (error) {
+                    console.error(error);
+                    notifyError("No se pudo eliminar");
+                }
             }
-        }
+        );
     };
 
     const startEdit = (dir) => {
@@ -119,10 +125,10 @@ export const ProfilePage = () => {
             );
             setMisDirecciones(updatedList);
             setEditingAddress(null);
-            alert("Dirección actualizada");
+            notifySuccess("Dirección actualizada correctamente");
         } catch (error) {
             console.error(error);
-            alert("Error al actualizar");
+            notifyError("Error al actualizar");
         }
     };
 
@@ -132,7 +138,7 @@ export const ProfilePage = () => {
     const openReturnModal = (pedido, item) => {
         // Validación extra: Verificar que tenga factura
         if (!pedido.factura) {
-             alert("Este pedido aún no tiene factura generada. Espera un momento o contacta a soporte.");
+             notifyWarning("Este pedido aún no tiene factura generada. Espera un momento o contacta a soporte.");
              return;
         }
 
@@ -157,7 +163,7 @@ export const ProfilePage = () => {
         e.preventDefault();
         
         if (!returnForm.causa) {
-            alert("Por favor selecciona una causa de devolución");
+            notifyWarning("Por favor selecciona una causa de devolución");
             return;
         }
 
@@ -186,7 +192,7 @@ export const ProfilePage = () => {
 
             await devolucionesAPI.create(nuevaDevolucion);
             
-            alert("Solicitud enviada con éxito.");
+            notifySuccess("Solicitud enviada con éxito.");
             closeReturnModal();
             setActiveTab('returns');
             
@@ -197,7 +203,7 @@ export const ProfilePage = () => {
 
         } catch (error) {
             console.error(error);
-            alert("Error al solicitar devolución: " + (error.response?.data?.message || error.message));
+            notifyError("Error al solicitar devolución: " + (error.response?.data?.message || error.message));
         }
     };
 

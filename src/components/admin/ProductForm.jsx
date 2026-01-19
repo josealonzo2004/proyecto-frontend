@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useProducts } from '../../context/ProductsContext';
 import { HiOutlinePhoto } from 'react-icons/hi2'; // Opcional: Icono para que se vea bonito
+import { notifySuccess, notifyError } from '../../utils/notifications';
 
 export const ProductForm = ({ product = null, onClose }) => {
     // Obtenemos las funciones del contexto
@@ -105,10 +106,10 @@ export const ProductForm = ({ product = null, onClose }) => {
             }
             
             onClose();
-            alert('Operación exitosa');
+            notifySuccess('Producto guardado exitosamente');
         } catch (error) {
             console.error("Error:", error);
-            alert("Hubo un error al guardar el producto");
+            notifyError("Hubo un error al guardar el producto");
         }
     };
 

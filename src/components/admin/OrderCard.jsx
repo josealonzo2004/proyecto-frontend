@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useOrders } from '../../context/OrdersContext';
 import { HiOutlineMapPin, HiOutlinePhone } from 'react-icons/hi2';
 import { HiOutlineMail } from 'react-icons/hi';
+import { notifySuccess, notifyError } from '../../utils/notifications';
 
 export const OrderCard = ({ order }) => {
     const { updateOrderStatus } = useOrders();
@@ -39,10 +40,10 @@ export const OrderCard = ({ order }) => {
         try {
             await updateOrderStatus(order.pedidoId, selectedEstadoId);
             // Mostrar notificación de éxito
-            alert('✓ Estado del pedido actualizado correctamente');
+            notifySuccess('Estado del pedido actualizado correctamente');
         } catch (error) {
             console.error('Error al actualizar estado:', error);
-            alert('✗ Error al actualizar el estado del pedido');
+            notifyError('Error al actualizar el estado del pedido');
         } finally {
             setIsUpdating(false);
         }
