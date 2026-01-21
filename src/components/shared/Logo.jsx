@@ -7,7 +7,7 @@ export const Logo = () => {
             to='/'
             className='flex items-center'>
             <img 
-                src='/img/COMPLETO_NEGRO_SIN_FONDO.png' 
+                src='/img/COMPLETO NEGRO SIN FONDO.png' 
                 alt='INNOVA ARTE' 
                 className='h-12 w-auto'
             />

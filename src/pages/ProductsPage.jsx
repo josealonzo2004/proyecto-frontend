@@ -3,12 +3,21 @@ import { ProductCard } from '../components/products/ProductCard';
 import { useCart } from '../context/CartContext';
 import { useProducts } from '../context/ProductsContext';
 import { HiOutlineMagnifyingGlass } from 'react-icons/hi2';
+import { HiCheckCircle, HiExclamationCircle } from 'react-icons/hi'; // Iconos para notificación
 
 export const ProductsPage = () => {
-    const { addToCart } = useCart();
+    const { addToCart, getProductQuantityInCart } = useCart();
     const { products } = useProducts();
     const [filteredProducts, setFilteredProducts] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
+
+    // --- SISTEMA DE NOTIFICACIONES (Igual al Admin) ---
+    const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+    const showToast = (message, type = 'success') => {
+        setNotification({ show: true, message, type });
+        setTimeout(() => setNotification({ show: false, message: '', type: '' }), 3000);
+    };
+    // --------------------------------------------------
 
     useEffect(() => {
         if (products && products.length >= 0) {
@@ -18,20 +27,31 @@ export const ProductsPage = () => {
 
     useEffect(() => {
         let filtered = products || [];
-
-        // Filtro por búsqueda
         if (searchTerm) {
             filtered = filtered.filter(p =>
                 p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 p.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
             );
         }
-
         setFilteredProducts(filtered);
     }, [searchTerm, products]);
 
     return (
-        <div>
+        <div className="relative">
+             {/* --- TOAST NOTIFICATION --- */}
+             {notification.show && (
+                <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-xl flex items-center gap-3 animate-bounce-in transition-all transform duration-300 ${
+                    notification.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200'
+                }`}>
+                    {notification.type === 'error' ? <HiExclamationCircle size={24} /> : <HiCheckCircle size={24} />}
+                    <div>
+                        <p className="font-bold">{notification.type === 'error' ? 'Atención' : 'Éxito'}</p>
+                        <p className="text-sm">{notification.message}</p>
+                    </div>
+                </div>
+            )}
+            {/* ------------------------- */}
+
             {/* Búsqueda */}
             <div className='mb-8'>
                 <div className='flex-1 relative max-w-md'>
@@ -47,17 +67,44 @@ export const ProductsPage = () => {
             </div>
 
             {/* Grid de productos */}
-            {/* CAMBIO: Usamos 'grid-cols-2' en móvil y 'lg:grid-cols-4' en PC */}
             <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4'>
                 {filteredProducts.map(product => {
-                    // ... lógica de variante ...
                     return (
                         <ProductCard
-                            key={product.productoId} // Usa productoId
+                            key={product.productoId} 
                             product={product}
                             onAddToCart={() => {
-                                // ... tu lógica de agregar ...
-                                alert("Producto agregado al carrito"); // Solución problema 2 (rápida)
+                                // 1. Verificar Stock real vs Carrito
+                                const stockTotal = product.stock || 0;
+                                const inCart = getProductQuantityInCart(product.productoId);
+                                
+                                if (inCart >= stockTotal) {
+                                    showToast("¡Has alcanzado el límite de stock disponible!", 'error');
+                                    return;
+                                }
+
+                                let variantToAdd;
+                                
+                                const validVariants = product.variantes?.filter(v => 
+                                    v.nombre.trim().toLowerCase() !== 'prueba'
+                                ) || [];
+                                
+                                if (validVariants.length > 0) {
+                                    variantToAdd = {
+                                        ...validVariants[0],
+                                        precio: Number(validVariants[0].precio)
+                                    };
+                                } else {
+                                    variantToAdd = {
+                                        nombre: 'Estándar',
+                                        precio: Number(product.precio),
+                                        productoId: product.productoId,
+                                        varianteId: null 
+                                    };
+                                }
+
+                                addToCart(product, variantToAdd, null); 
+                                showToast("¡Agregado al carrito!", 'success');
                             }}
                         />
                     );

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useProducts } from '../../context/ProductsContext';
-import { HiOutlinePhoto } from 'react-icons/hi2'; // Opcional: Icono para que se vea bonito
+import { HiOutlinePhoto, HiCheckCircle, HiExclamationCircle } from 'react-icons/hi2'; // Iconos añadidos
 
 export const ProductForm = ({ product = null, onClose }) => {
     // Obtenemos las funciones del contexto
@@ -9,6 +9,14 @@ export const ProductForm = ({ product = null, onClose }) => {
     // 1. ESTADO PARA LA IMAGEN (NUEVO)
     const [imageFile, setImageFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(product?.imagen || null);
+
+    // --- NOTIFICACIONES ---
+    const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+    const showToast = (message, type = 'success') => {
+        setNotification({ show: true, message, type });
+        setTimeout(() => setNotification({ show: false, message: '', type: '' }), 3000);
+    };
+    // ----------------------
 
     const [formData, setFormData] = useState({
         nombre: product?.nombre || '',
@@ -82,7 +90,6 @@ export const ProductForm = ({ product = null, onClose }) => {
                         })
                 };
                 
-                // 3. PASAMOS EL ARCHIVO COMO SEGUNDO ARGUMENTO (NUEVO)
                 await updateProduct(product.productoId || product.id, payloadEdicion, imageFile);
 
             } else {
@@ -100,20 +107,34 @@ export const ProductForm = ({ product = null, onClose }) => {
                         }))
                 };
                 
-                // 3. PASAMOS EL ARCHIVO COMO SEGUNDO ARGUMENTO (NUEVO)
                 await addProduct(createPayload, imageFile);
             }
             
-            onClose();
-            alert('Operación exitosa');
+            showToast('Operación exitosa', 'success');
+            // Damos un pequeño delay antes de cerrar para que se vea el toast
+            setTimeout(() => {
+                 onClose();
+            }, 1000);
+
         } catch (error) {
             console.error("Error:", error);
-            alert("Hubo un error al guardar el producto");
+            showToast("Hubo un error al guardar el producto", 'error');
         }
     };
 
     return (
-        <div className='bg-white rounded-lg p-6 border border-gray-200 overflow-y-auto max-h-[90vh] shadow-xl'>
+        <div className='bg-white rounded-lg p-6 border border-gray-200 overflow-y-auto max-h-[90vh] shadow-xl relative'>
+            
+             {/* --- TOAST --- */}
+             {notification.show && (
+                <div className={`absolute top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-xl flex items-center gap-3 transition-all transform duration-300 ${
+                    notification.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200'
+                }`}>
+                    {notification.type === 'error' ? <HiExclamationCircle size={20} /> : <HiCheckCircle size={20} />}
+                    <span className="font-medium text-sm">{notification.message}</span>
+                </div>
+            )}
+            
             <h2 className='text-2xl font-bold mb-6 text-gray-800'>
                 {product ? 'Editar Producto' : 'Agregar Nuevo Producto'}
             </h2>

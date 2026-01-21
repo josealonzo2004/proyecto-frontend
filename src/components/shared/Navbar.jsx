@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { HiOutlineSearch, HiOutlineShoppingBag } from 'react-icons/hi'
+import { HiOutlineShoppingBag, HiLogout, HiUser } from 'react-icons/hi' 
 import { FaBarsStaggered } from 'react-icons/fa6'
 import { navbarLinks } from '../../constants/links'
 import { useAuth } from '../../context/AuthContext'
@@ -27,29 +27,33 @@ export const Navbar = () => {
   const handleRegister = () => navigate('/registro');
 
   const handleLogout = () => {
-    logout();        // ← Llama a tu AuthContext
-    navigate('/');   // ← Redirige al home o donde prefieras
+    logout();
+    navigate('/');
   };
 
   return (
-    <header className={`${isHome ? 'absolute top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-sm' : 'bg-white'} text-black py-4 flex items-center justify-between px-5 border-b border-slate-200 lg:px-12`}>
+    // AGREGADO: 'print:hidden' hace que todo el navbar desaparezca al darle a Imprimir
+    <header className={`${isHome ? 'absolute top-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-md shadow-sm' : 'bg-white shadow-sm'} text-gray-800 py-4 flex items-center justify-between px-6 lg:px-12 transition-all duration-300 print:hidden`}>
       
-            {/* Logo enlazado al Home */}
-      <Link to="/" className="flex items-center">
+      {/* LOGO */}
+      <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
         <img 
           src="/images/COMPLETO_NEGRO_SIN_FONDO.png" 
-          alt="Logo" 
-          className="h-12 w-auto object-contain" 
+          alt="Innova Arte" 
+          className="h-10 w-auto object-contain" 
         />
       </Link>
 
-      <nav className='space-x-5 hidden md:flex'>
+      {/* MENÚ DE NAVEGACIÓN */}
+      <nav className='hidden md:flex items-center space-x-8'>
         {navbarLinks.map(link => (
           <NavLink
             key={link.id}
             to={link.href}
             className={({ isActive }) =>
-              `${isActive ? 'text-cyan-600 underline' : ''} transition-all duration-300 font-medium hover:text-cyan-600 hover:underline`
+              `text-sm font-semibold tracking-wide transition-colors duration-200 ${
+                isActive ? 'text-cyan-600' : 'text-gray-600 hover:text-cyan-600'
+              }`
             }
           >
             {link.title}
@@ -59,7 +63,9 @@ export const Navbar = () => {
         <NavLink
           to='/productos'
           className={({ isActive }) =>
-            `${isActive ? 'text-cyan-600 underline' : ''} transition-all duration-300 font-medium hover:text-cyan-600 hover:underline`
+            `text-sm font-semibold tracking-wide transition-colors duration-200 ${
+              isActive ? 'text-cyan-600' : 'text-gray-600 hover:text-cyan-600'
+            }`
           }
         >
           Productos
@@ -69,75 +75,43 @@ export const Navbar = () => {
           <NavLink
             to='/admin'
             className={({ isActive }) =>
-              `${isActive ? 'text-cyan-600 underline' : ''} transition-all duration-300 font-medium hover:text-cyan-600 hover:underline`
+              `px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+                isActive 
+                ? 'bg-cyan-50 border-cyan-200 text-cyan-700' 
+                : 'border-gray-200 text-gray-500 hover:border-cyan-200 hover:text-cyan-600'
+              }`
             }
           >
-            Admin
+            PANEL ADMIN
           </NavLink>
         )}
       </nav>
 
-      <div className='flex gap-5 items-center'>
-
-        {/* SI NO ESTÁ AUTENTICADO */}
+      {/* BOTONES DE ACCIÓN */}
+      <div className='flex items-center gap-6'>
         {!isAuthenticated ? (
-          <div className='hidden md:flex gap-3'>
-            <button
-              onClick={handleLogin}
-              className='px-4 py-2 border border-slate-300 rounded-md font-medium hover:bg-slate-50'
-            >
-              Iniciar sesión
-            </button>
-
-            <button
-              onClick={handleRegister}
-              className='px-4 py-2 bg-cyan-600 text-white rounded-md font-medium hover:bg-cyan-700'
-            >
-              Registrarse
-            </button>
+          <div className='hidden md:flex items-center gap-4'>
+            <button onClick={handleLogin} className='text-sm font-semibold text-gray-600 hover:text-cyan-600 transition-colors'>Iniciar sesión</button>
+            <button onClick={handleRegister} className='px-5 py-2 bg-cyan-600 text-white text-sm font-bold rounded-full hover:bg-cyan-700 transition-transform active:scale-95 shadow-md shadow-cyan-100'>Registrarse</button>
           </div>
         ) : (
           <>
-            {/* LUPA */}
-            <button title='Buscar' className='hidden md:block'>
-              <HiOutlineSearch size={25} />
-            </button>
-
-            {/* AVATAR */}
-            <div className='relative'>
-              <button
-                onClick={handleUserClick}
-                className='border-2 border-slate-700 w-9 h-9 rounded-full grid place-items-center text-lg font-bold'
-                title={user?.nombre ? `Perfil de ${user.nombre}` : 'Perfil'}
-              >
-                {user?.nombre ? user.nombre[0].toUpperCase() : 'U'}
-              </button>
-            </div>
-
-            {/* CARRITO */}
-            <button className='relative' onClick={handleCartClick} title='Carrito'>
-              <span className='absolute -bottom-2 -right-2 w-5 h-5 grid place-items-center bg-black text-white text-xs rounded-full'>
+            <button className='relative group p-1' onClick={handleCartClick} title='Ver Carrito'>
+              <div className='absolute -top-1.5 -right-1.5 w-5 h-5 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full shadow-sm group-hover:scale-110 transition-transform'>
                 {typeof getTotalItems === 'function' ? getTotalItems() || 0 : 0}
-              </span>
-              <HiOutlineShoppingBag size={25} />
+              </div>
+              <HiOutlineShoppingBag className="w-6 h-6 text-gray-600 group-hover:text-cyan-600 transition-colors" />
             </button>
-
-            {/* NUEVO BOTÓN CERRAR SESIÓN */}
-            <button
-              onClick={handleLogout}
-              className='px-3 py-2 bg-cyan-600 text-white rounded-md font-medium hover:bg-cyan-700'
-            >
-              Cerrar sesión
+            <button onClick={handleUserClick} className='w-9 h-9 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 text-white font-bold text-sm flex items-center justify-center shadow-md hover:shadow-lg hover:ring-2 hover:ring-offset-2 hover:ring-cyan-200 transition-all' title={user?.nombre ? `Hola, ${user.nombre}` : 'Mi Perfil'}>
+              {user?.nombre ? user.nombre[0].toUpperCase() : <HiUser />}
+            </button>
+            <button onClick={handleLogout} className='text-gray-400 hover:text-red-500 transition-colors p-1' title="Cerrar sesión">
+              <HiLogout className="w-6 h-6" />
             </button>
           </>
         )}
-
+        <button className='md:hidden text-gray-700 hover:text-cyan-600 transition-colors'><FaBarsStaggered size={24} /></button>
       </div>
-
-      {/* MOBILE MENU */}
-      <button className='md:hidden'>
-        <FaBarsStaggered size={25} />
-      </button>
     </header>
   )
 }
