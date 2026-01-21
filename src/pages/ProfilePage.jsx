@@ -5,7 +5,8 @@ import { direccionesAPI, pedidosAPI, devolucionesAPI, usersAPI } from "../servic
 import { 
     HiPencil, HiTrash, HiX, HiReply, HiExclamationCircle, 
     HiUser, HiLocationMarker, HiShoppingBag, 
-    HiRefresh, HiChevronLeft, HiChevronRight
+    HiRefresh, HiChevronLeft, HiChevronRight,
+    HiCheckCircle // Agregado
 } from 'react-icons/hi'; 
 
 // --- COMPONENTE DE PAGINACIÓN MEJORADO (Smart Pagination) ---
@@ -137,6 +138,14 @@ export const ProfilePage = () => {
     const [returnForm, setReturnForm] = useState({ causa: '', comentario: '' });
     const [invoiceFile, setInvoiceFile] = useState(null);
 
+    // --- NOTIFICACIONES (TOAST) ---
+    const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+    const showToast = (message, type = 'success') => {
+        setNotification({ show: true, message, type });
+        setTimeout(() => setNotification({ show: false, message: '', type: '' }), 3000);
+    };
+    // ------------------------------
+
     // --- CARGA INICIAL ---
     useEffect(() => {
         if (user) {
@@ -151,7 +160,6 @@ export const ProfilePage = () => {
     useEffect(() => {
         if (activeTab === 'addresses') {
             direccionesAPI.getAll().then((res) => {
-                // --- CORRECCIÓN AQUÍ: Ordenar direcciones (Nuevas primero) ---
                 const sortedAddresses = res.data.sort((a, b) => b.direccionId - a.direccionId);
                 setMisDirecciones(sortedAddresses);
             }).catch(console.error);
@@ -194,13 +202,13 @@ export const ProfilePage = () => {
         try {
             if (usersAPI && usersAPI.update) {
                 await usersAPI.update(user.usuarioId, profileForm);
-                alert("¡Datos actualizados correctamente!");
+                showToast("¡Datos actualizados correctamente!", 'success');
             } else {
-                alert("Error técnico: API no configurada.");
+                showToast("Error técnico: API no configurada.", 'error');
             }
         } catch (error) {
             console.error(error);
-            alert("Error al actualizar perfil");
+            showToast("Error al actualizar perfil", 'error');
         }
     };
 
@@ -208,6 +216,7 @@ export const ProfilePage = () => {
         if (window.confirm('¿Eliminar dirección?')) {
             await direccionesAPI.delete(id);
             setMisDirecciones(misDirecciones.filter(dir => dir.direccionId !== id));
+            showToast("Dirección eliminada", 'success');
         }
     };
     const startEdit = (dir) => {
@@ -226,10 +235,11 @@ export const ProfilePage = () => {
         // Reordenar también después de editar para mantener el orden correcto
         setMisDirecciones(updated.sort((a, b) => b.direccionId - a.direccionId));
         setEditingAddress(null);
+        showToast("Dirección actualizada", 'success');
     };
 
     const openReturnModal = (pedido, item) => {
-        if (!pedido.factura) { alert("Este pedido no tiene factura generada."); return; }
+        if (!pedido.factura) { showToast("Este pedido no tiene factura generada.", 'error'); return; }
         setReturnItemData({ pedido, detalle: item });
         setReturnForm({ causa: '', comentario: '' }); 
         setInvoiceFile(null); 
@@ -240,7 +250,7 @@ export const ProfilePage = () => {
 
     const submitReturn = async (e) => {
         e.preventDefault();
-        if (!returnForm.causa) return alert("Selecciona una causa");
+        if (!returnForm.causa) return showToast("Selecciona una causa", 'error');
         
         try {
             const archivoInfo = invoiceFile ? ` (Archivo: ${invoiceFile.name})` : '';
@@ -254,16 +264,30 @@ export const ProfilePage = () => {
                 estadoId: 1, 
                 usuarioCreaId: user.usuarioId
             });
-            alert("Solicitud enviada");
+            showToast("Solicitud enviada correctamente", 'success');
             setShowReturnModal(false);
             setActiveTab('returns');
             const res = await devolucionesAPI.getAll();
             setMisDevoluciones(res.data.filter(d => d.usuarioCreaId === user.usuarioId));
-        } catch (error) { alert("Error: " + error.message); }
+        } catch (error) { showToast("Error: " + error.message, 'error'); }
     };
 
     return (
-        <div className='min-h-screen bg-gray-50 py-10 px-4'>
+        <div className='min-h-screen bg-gray-50 py-10 px-4 relative'>
+            
+            {/* --- TOAST --- */}
+            {notification.show && (
+                <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-xl flex items-center gap-3 animate-bounce-in transition-all transform duration-300 ${
+                    notification.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200'
+                }`}>
+                    {notification.type === 'error' ? <HiExclamationCircle size={24} /> : <HiCheckCircle size={24} />}
+                    <div>
+                        <p className="font-bold">{notification.type === 'error' ? 'Atención' : 'Éxito'}</p>
+                        <p className="text-sm">{notification.message}</p>
+                    </div>
+                </div>
+            )}
+            
             <div className='max-w-6xl mx-auto'>
                 {/* HEADER PERFIL */}
                 <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 flex flex-col md:flex-row items-center gap-6 mb-8">

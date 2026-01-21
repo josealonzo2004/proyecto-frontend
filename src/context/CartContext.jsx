@@ -13,14 +13,13 @@ export const useCart = () => {
 export const CartProvider = ({ children }) => {
     const [cartItems, setCartItems] = useState([]);
 
-    // Cargar carrito y convertir precios a números por seguridad
+    // Cargar carrito
     useEffect(() => {
         try {
             const savedCart = localStorage.getItem('cart');
             if (savedCart) {
                 const parsed = JSON.parse(savedCart);
                 if (Array.isArray(parsed)) {
-                    // Limpieza de datos al cargar
                     const cleanCart = parsed.map(item => ({
                         ...item,
                         quantity: Number(item.quantity),
@@ -38,6 +37,7 @@ export const CartProvider = ({ children }) => {
         }
     }, []);
 
+    // Guardar carrito
     useEffect(() => {
         try {
             localStorage.setItem('cart', JSON.stringify(cartItems));
@@ -46,18 +46,52 @@ export const CartProvider = ({ children }) => {
         }
     }, [cartItems]);
 
+    // --- NUEVA FUNCIÓN: Obtener cantidad actual de un producto en el carrito ---
+    const getProductQuantityInCart = (productId) => {
+        return cartItems.reduce((total, item) => {
+            if (item.product.productoId === productId) {
+                return total + item.quantity;
+            }
+            return total;
+        }, 0);
+    };
+
     const addToCart = (product, variant, customization = null) => {
-        const cartItem = {
-            id: Date.now(),
-            product,
-            variant: {
-                ...variant,
-                precio: Number(variant?.precio || 0) // Forzar número
-            },
-            customization,
-            quantity: 1
-        };
-        setCartItems(prev => [...prev, cartItem]);
+        // 1. Verificar Stock Global
+        const currentQtyInCart = getProductQuantityInCart(product.productoId);
+        const stockDisponible = product.stock || 0;
+
+        if (currentQtyInCart + 1 > stockDisponible) {
+            alert(`No puedes agregar más. Stock máximo disponible: ${stockDisponible}`);
+            return;
+        }
+
+        // 2. Buscar si ya existe este item exacto (mismo producto, variante y personalización)
+        const existingItemIndex = cartItems.findIndex(item => 
+            item.product.productoId === product.productoId &&
+            item.variant.nombre === variant.nombre && 
+            JSON.stringify(item.customization) === JSON.stringify(customization)
+        );
+
+        if (existingItemIndex >= 0) {
+            // Si existe, actualizamos la cantidad
+            const newCart = [...cartItems];
+            newCart[existingItemIndex].quantity += 1;
+            setCartItems(newCart);
+        } else {
+            // Si no existe, creamos uno nuevo
+            const cartItem = {
+                id: Date.now(),
+                product,
+                variant: {
+                    ...variant,
+                    precio: Number(variant?.precio || 0)
+                },
+                customization,
+                quantity: 1
+            };
+            setCartItems(prev => [...prev, cartItem]);
+        }
     };
 
     const removeFromCart = (itemId) => {
@@ -67,6 +101,27 @@ export const CartProvider = ({ children }) => {
     const updateQuantity = (itemId, quantity) => {
         const qty = Number(quantity);
         if (qty < 1) return;
+
+        // Buscar el item para verificar stock
+        const itemToUpdate = cartItems.find(item => item.id === itemId);
+        if (!itemToUpdate) return;
+
+        // Calcular cuántos otros items de este mismo producto hay en el carrito (excluyendo este mismo)
+        const otherItemsQty = cartItems.reduce((sum, item) => {
+            if (item.id !== itemId && item.product.productoId === itemToUpdate.product.productoId) {
+                return sum + item.quantity;
+            }
+            return sum;
+        }, 0);
+
+        const stockDisponible = itemToUpdate.product.stock || 0;
+
+        // Validar: (Cantidad de otros iguales) + (Nueva cantidad deseada) <= Stock
+        if ((otherItemsQty + qty) > stockDisponible) {
+            alert(`Stock insuficiente. Máximo disponible: ${stockDisponible}`);
+            return; // No actualizamos si supera el stock
+        }
+
         setCartItems(prev => prev.map(item => 
             item.id === itemId ? { ...item, quantity: qty } : item
         ));
@@ -96,7 +151,8 @@ export const CartProvider = ({ children }) => {
         updateQuantity,
         clearCart,
         getTotal,
-        getTotalItems
+        getTotalItems,
+        getProductQuantityInCart // Exportamos esta función útil
     };
 
     return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
