@@ -18,13 +18,14 @@ export const UsersProvider = ({ children }) => {
   const { user: currentUser } = useAuth();
 
   const fetchUsers = async (query = "") => {
+    // PROTECCIÓN ADICIONAL: Si no es admin, no hacemos nada (por si se llama manualmente)
+    if (!currentUser || currentUser.rolId !== 2) return;
+
     setLoadingUsers(true);
     setErrorUsers(null);
     try {
-      // si quieres búsqueda por backend, soporta query param ?q=...
-      const res = await usersAPI.getAll(/* optionally: { params: { q: query } } */);
+      const res = await usersAPI.getAll();
       setUsers(res.data || []);
-      // si quieres filtrar en frontend por query:
       if (query) {
         const q = query.toLowerCase();
         setUsers((res.data || []).filter(u =>
@@ -34,16 +35,23 @@ export const UsersProvider = ({ children }) => {
       }
     } catch (err) {
       console.error("Error cargando usuarios", err);
-      setErrorUsers(err?.response?.data || "No se pudieron cargar los usuarios");
+      // Solo mostramos error si realmente falló algo técnico, no por permisos (aunque el if de arriba ya lo evita)
+      if (err.response?.status !== 403) {
+          setErrorUsers(err?.response?.data || "No se pudieron cargar los usuarios");
+      }
     } finally {
       setLoadingUsers(false);
     }
   };
 
   useEffect(() => {
-    // Solo cargar usuarios si hay un usuario autenticado
-    if (currentUser) {
+    // --- CORRECCIÓN AQUÍ ---
+    // Solo cargar usuarios si existe usuario Y es ADMINISTRADOR (rolId === 2)
+    if (currentUser && currentUser.rolId === 2) {
       fetchUsers();
+    } else {
+      // Si deja de ser admin o hace logout, limpiamos la lista por seguridad
+      setUsers([]);
     }
   }, [currentUser]);
 
@@ -62,17 +70,14 @@ export const UsersProvider = ({ children }) => {
       };
 
       const res = await usersAPI.create(payload);
-      // Si backend devuelve el usuario creado:
       if (res?.data) {
         setUsers(prev => [...prev, res.data]);
         return res.data;
       }
-      // Si no devuelve, recargamos la lista
       await fetchUsers();
       return null;
     } catch (err) {
       console.error("createUser error", err);
-      // lanzar el mensaje para que UI lo muestre
       const message = err?.response?.data?.message || err?.response?.data || err.message;
       throw new Error(typeof message === 'string' ? message : JSON.stringify(message));
     }
@@ -81,10 +86,8 @@ export const UsersProvider = ({ children }) => {
   // Update
   const updateUser = async (id, data) => {
     try {
-      // build payload according to UpdateUsuarioDto (it probably accepts optional fields)
       const payload = { ...data };
       const res = await usersAPI.update(id, payload);
-      // recargar lista o actualizar localmente:
       await fetchUsers();
       return res.data;
     } catch (err) {
@@ -114,4 +117,3 @@ export const UsersProvider = ({ children }) => {
     </UsersContext.Provider>
   );
 };
-
