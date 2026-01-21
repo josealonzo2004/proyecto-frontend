@@ -3,37 +3,34 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { HiOutlineShoppingCart, HiArrowLeft, HiCheckCircle, HiExclamationCircle } from 'react-icons/hi';
 import { useCart } from '../context/CartContext';
 import { useProducts } from '../context/ProductsContext';
+import { useAuth } from '../context/AuthContext'; // <--- IMPORTAR AUTH
 
 export const ProductDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     
     const { addToCart, getProductQuantityInCart } = useCart();
-    // AGREGADO: 'fetchProducts'
     const { products, loading, fetchProducts } = useProducts(); 
+    const { user } = useAuth(); // <--- OBTENER USUARIO
     
     const [selectedVariant, setSelectedVariant] = useState(null);
     const [quantity, setQuantity] = useState(1);
     const [customizationText, setCustomizationText] = useState('');
     const [customizationFile, setCustomizationFile] = useState(null);
 
-    // --- AGREGADO: AUTO-REFRESCO ---
+    // --- AUTO-REFRESCO ---
     useEffect(() => {
         const interval = setInterval(() => {
             if(fetchProducts) fetchProducts();
-        }, 1000); // 5 seg
+        }, 5000); 
         return () => clearInterval(interval);
     }, [fetchProducts]);
-    // -----------------------------
 
-    // Estado para notificaciones (Toast)
+    // Toast
     const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
-
     const showToast = (message, type = 'success') => {
         setNotification({ show: true, message, type });
-        setTimeout(() => {
-            setNotification(prev => ({ ...prev, show: false }));
-        }, 3000);
+        setTimeout(() => setNotification({ show: false, message: '', type: '' }), 3000);
     };
 
     const product = (products && products.length > 0) 
@@ -99,6 +96,13 @@ export const ProductDetail = () => {
     };
 
     const handleAddToCart = async () => {
+        // 1. VALIDACIÓN DE SESIÓN (NUEVO)
+        if (!user) {
+            showToast("Debes iniciar sesión para comprar", 'error');
+            setTimeout(() => navigate('/login'), 1500);
+            return;
+        }
+
         if (!selectedVariant) return;
         
         if (quantity > availableToAdd) {
@@ -129,6 +133,13 @@ export const ProductDetail = () => {
     };
 
     const handleBuyNow = async () => {
+        // 1. VALIDACIÓN DE SESIÓN (NUEVO)
+        if (!user) {
+            showToast("Debes iniciar sesión para comprar", 'error');
+            setTimeout(() => navigate('/login'), 1500);
+            return;
+        }
+
         if (!selectedVariant) return;
         
         if (quantity > availableToAdd) {
@@ -159,7 +170,6 @@ export const ProductDetail = () => {
     return (
         <div className='max-w-6xl mx-auto px-4 py-8 relative notranslate'>
             
-            {/* --- TOAST NOTIFICATION --- */}
             {notification.show && (
                 <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-xl flex items-center gap-3 animate-bounce-in transition-all transform duration-300 ${
                     notification.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200'
