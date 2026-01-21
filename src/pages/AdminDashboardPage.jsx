@@ -12,7 +12,7 @@ import {
   HiSearch, HiChevronLeft, HiChevronRight, HiPlus,
   HiEye, HiTrash, HiPencil, HiSave,
   HiCheckCircle, HiExclamationCircle,
-  HiClipboardList, HiDownload, HiRefresh // Agregado HiRefresh
+  HiClipboardList, HiDownload, HiRefresh 
 } from 'react-icons/hi';
 
 import { ProductForm } from '../components/admin/ProductForm';
@@ -43,18 +43,16 @@ const Pagination = ({ totalItems, itemsPerPage, currentPage, onPageChange }) => 
 
 export const AdminDashboardPage = () => {
   const { isAdmin } = useAuth();
-  // IMPORTANTE: Asegúrate de que tu Context exporte 'fetchProducts'
   const { products, deleteProduct, updateProduct, addProduct, fetchProducts } = useProducts();
-  // IMPORTANTE: Asegúrate de que tu Context exporte 'fetchOrders'
   const { orders, fetchOrders, updateOrderStatus } = useOrders(); 
   const { users = [], fetchUsers, createUser, updateUser, deleteUser } = useUsers();
   
   // ESTADOS DE UI
   const [activeSection, setActiveSection] = useState('reports');
   const ITEMS_PER_PAGE = 8;
-  const [lastUpdate, setLastUpdate] = useState(new Date()); // Para forzar render visual del tiempo
+  const [lastUpdate, setLastUpdate] = useState(new Date()); 
   
-  // Estados filtros/modales
+  // Estados para filtros y modales
   const [productSearch, setProductSearch] = useState('');
   const [productPage, setProductPage] = useState(1);
   const [showProductForm, setShowProductForm] = useState(false);
@@ -78,16 +76,15 @@ export const AdminDashboardPage = () => {
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState(null);
 
   // --- AUTO-REFRESCO (POLLING) ---
-  // Esto actualiza los datos cada 5 segundos para que veas el stock bajar "en vivo"
   useEffect(() => {
       const intervalId = setInterval(() => {
           if (fetchProducts) fetchProducts();
           if (fetchOrders) fetchOrders();
           if (activeSection === 'returns') fetchReturns();
           setLastUpdate(new Date());
-      }, 1000); // 5000ms = 5 segundos
+      }, 5000); 
 
-      return () => clearInterval(intervalId); // Limpiar al salir
+      return () => clearInterval(intervalId); 
   }, [fetchProducts, fetchOrders, activeSection]);
 
   const handleManualRefresh = () => {
@@ -197,7 +194,6 @@ export const AdminDashboardPage = () => {
       try {
           const newStatus = product.activo === undefined ? false : !product.activo;
           await updateProduct(product.productoId, { activo: newStatus });
-          // Importante: Actualizar lista después de cambiar estado
           if (fetchProducts) fetchProducts();
       } catch (error) { showToast("Error al cambiar estado", 'error'); }
   };
@@ -209,13 +205,13 @@ export const AdminDashboardPage = () => {
   const handleOrderStatusChange = async (orderId, newStatus) => {
       try { 
           await updateOrderStatus(orderId, Number(newStatus)); 
-          if(fetchOrders) fetchOrders(); // Forzar actualización inmediata
+          if(fetchOrders) fetchOrders(); 
           showToast("Estado actualizado", 'success'); 
       } 
       catch (error) { showToast("Error al actualizar", 'error'); }
   };
   const handleDeleteOrder = async (orderId) => {
-      if(!confirm("¿Eliminar pedido?")) return;
+      if(!confirm("¿Eliminar pedido permanentemente?")) return;
       try {
           await pedidosAPI.delete(orderId);
           if(fetchOrders) await fetchOrders();
@@ -243,19 +239,47 @@ export const AdminDashboardPage = () => {
         showToast("Devolución actualizada", 'success');
     } catch (error) { showToast("Error al procesar", 'error'); }
   };
+
+  // --- CORRECCIÓN AQUÍ: handleUserSubmit ---
   const handleUserSubmit = async (e) => { 
       e.preventDefault();
       try {
+        // 1. Copiamos el formulario
         const payload = { ...userForm };
-        if (!payload.contrasenaFriada) delete payload.contrasenaFriada;
-        if (editingUserId) await updateUser(editingUserId, payload);
-        else await createUser(userForm);
+
+        // 2. ELIMINAMOS PROPIEDADES QUE EL BACKEND NO ACEPTA
+        delete payload.usuarioId;
+        delete payload.fechaCreacion;
+        delete payload.fechaActualizacion;
+        delete payload.rol;      // El objeto rol completo no se debe enviar
+        delete payload.pedidos;  // Relaciones no se envían
+        delete payload.direcciones;
+
+        // 3. Limpieza de contraseña vacía
+        if (!payload.contrasenaFriada) {
+            delete payload.contrasenaFriada;
+        }
+
+        // 4. Enviar datos limpios
+        if (editingUserId) {
+            await updateUser(editingUserId, payload);
+        } else {
+            await createUser(userForm);
+        }
+
         setUserForm({ nombre: '', apellido: '', correoElectronico: '', telefono: '', contrasenaFriada: '', rolId: 1 });
         setEditingUserId(null);
         await fetchUsers();
-        showToast('Usuario guardado', 'success');
-      } catch (err) { showToast(err.message, 'error'); }
+        showToast('Usuario guardado exitosamente', 'success');
+      } catch (err) { 
+          // Manejo de errores más amigable
+          const errorMsg = err.response?.data?.message 
+            ? (Array.isArray(err.response.data.message) ? err.response.data.message.join(', ') : err.response.data.message)
+            : err.message;
+          showToast(errorMsg, 'error'); 
+      }
   };
+  // -----------------------------------------
 
   // Filtros
   const filteredProducts = (products || []).filter(p => p.nombre.toLowerCase().includes(productSearch.toLowerCase()));
@@ -305,7 +329,7 @@ export const AdminDashboardPage = () => {
       {activeSection === 'reports' && reportData && (
         <div className='animate-fade-in space-y-8'>
             <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <div><h2 className="text-2xl font-bold text-gray-800">Resumen General</h2></div>
+                <div><h2 className="text-2xl font-bold text-gray-800">Resumen General</h2><p className="text-gray-500 text-sm mt-1">Reportes y métricas de rendimiento (Actualizado: {lastUpdate.toLocaleTimeString()})</p></div>
                 <button onClick={() => window.print()} className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-black transition-colors print:hidden"><HiDownload size={20} /> Guardar PDF</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
