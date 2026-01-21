@@ -1,33 +1,35 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // <--- IMPORTAR NAVIGATE
 import { ProductCard } from '../components/products/ProductCard';
 import { useCart } from '../context/CartContext';
 import { useProducts } from '../context/ProductsContext';
+import { useAuth } from '../context/AuthContext'; // <--- IMPORTAR AUTH
 import { HiOutlineMagnifyingGlass } from 'react-icons/hi2';
-import { HiCheckCircle, HiExclamationCircle } from 'react-icons/hi'; // Iconos para notificación
+import { HiCheckCircle, HiExclamationCircle } from 'react-icons/hi'; 
 
 export const ProductsPage = () => {
     const { addToCart, getProductQuantityInCart } = useCart();
-    // AGREGADO: fetchProducts
     const { products, fetchProducts } = useProducts();
+    const { user } = useAuth(); // <--- OBTENER USUARIO
+    const navigate = useNavigate(); // <--- OBTENER NAVIGATE
+
     const [filteredProducts, setFilteredProducts] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // --- SISTEMA DE NOTIFICACIONES (Igual al Admin) ---
+    // --- SISTEMA DE NOTIFICACIONES ---
     const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
     const showToast = (message, type = 'success') => {
         setNotification({ show: true, message, type });
         setTimeout(() => setNotification({ show: false, message: '', type: '' }), 3000);
     };
-    // --------------------------------------------------
 
-    // --- AGREGADO: AUTO-REFRESCO ---
+    // --- AUTO-REFRESCO ---
     useEffect(() => {
         const interval = setInterval(() => {
             if(fetchProducts) fetchProducts();
-        }, 1000);
+        }, 5000);
         return () => clearInterval(interval);
     }, [fetchProducts]);
-    // -----------------------------
 
     useEffect(() => {
         if (products && products.length >= 0) {
@@ -48,7 +50,7 @@ export const ProductsPage = () => {
 
     return (
         <div className="relative">
-             {/* --- TOAST NOTIFICATION --- */}
+             {/* TOAST */}
              {notification.show && (
                 <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-xl flex items-center gap-3 animate-bounce-in transition-all transform duration-300 ${
                     notification.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200'
@@ -60,7 +62,6 @@ export const ProductsPage = () => {
                     </div>
                 </div>
             )}
-            {/* ------------------------- */}
 
             {/* Búsqueda */}
             <div className='mb-8'>
@@ -76,7 +77,7 @@ export const ProductsPage = () => {
                 </div>
             </div>
 
-            {/* Grid de productos */}
+            {/* Grid */}
             <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4'>
                 {filteredProducts.map(product => {
                     return (
@@ -84,7 +85,14 @@ export const ProductsPage = () => {
                             key={product.productoId} 
                             product={product}
                             onAddToCart={() => {
-                                // 1. Verificar Stock real vs Carrito
+                                // 1. VALIDACIÓN DE SESIÓN (NUEVO)
+                                if (!user) {
+                                    showToast("Debes iniciar sesión para comprar", 'error');
+                                    setTimeout(() => navigate('/login'), 1500); // Redirige tras 1.5 seg
+                                    return;
+                                }
+
+                                // 2. Verificar Stock
                                 const stockTotal = product.stock || 0;
                                 const inCart = getProductQuantityInCart(product.productoId);
                                 
@@ -94,7 +102,6 @@ export const ProductsPage = () => {
                                 }
 
                                 let variantToAdd;
-                                
                                 const validVariants = product.variantes?.filter(v => 
                                     v.nombre.trim().toLowerCase() !== 'prueba'
                                 ) || [];
