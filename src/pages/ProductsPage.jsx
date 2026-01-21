@@ -7,7 +7,8 @@ import { HiCheckCircle, HiExclamationCircle } from 'react-icons/hi'; // Iconos p
 
 export const ProductsPage = () => {
     const { addToCart, getProductQuantityInCart } = useCart();
-    const { products } = useProducts();
+    // AGREGADO: fetchProducts
+    const { products, fetchProducts } = useProducts();
     const [filteredProducts, setFilteredProducts] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -18,6 +19,15 @@ export const ProductsPage = () => {
         setTimeout(() => setNotification({ show: false, message: '', type: '' }), 3000);
     };
     // --------------------------------------------------
+
+    // --- AGREGADO: AUTO-REFRESCO ---
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if(fetchProducts) fetchProducts();
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [fetchProducts]);
+    // -----------------------------
 
     useEffect(() => {
         if (products && products.length >= 0) {
