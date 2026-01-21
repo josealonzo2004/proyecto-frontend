@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useProducts } from '../context/ProductsContext';
 import { useOrders } from '../context/OrdersContext';
@@ -12,7 +12,7 @@ import {
   HiSearch, HiChevronLeft, HiChevronRight, HiPlus,
   HiEye, HiTrash, HiPencil, HiSave,
   HiCheckCircle, HiExclamationCircle,
-  HiClipboardList, HiDownload 
+  HiClipboardList, HiDownload, HiRefresh 
 } from 'react-icons/hi';
 
 import { ProductForm } from '../components/admin/ProductForm';
@@ -43,49 +43,66 @@ const Pagination = ({ totalItems, itemsPerPage, currentPage, onPageChange }) => 
 
 export const AdminDashboardPage = () => {
   const { isAdmin } = useAuth();
-  const { products, deleteProduct, updateProduct } = useProducts();
+  const { products, deleteProduct, updateProduct, addProduct, fetchProducts } = useProducts();
   const { orders, fetchOrders, updateOrderStatus } = useOrders(); 
   const { users = [], fetchUsers, createUser, updateUser, deleteUser } = useUsers();
   
   // ESTADOS DE UI
   const [activeSection, setActiveSection] = useState('reports');
   const ITEMS_PER_PAGE = 8;
+  const [lastUpdate, setLastUpdate] = useState(new Date()); 
   
-  // Estados: Productos
+  // Estados para filtros y modales
   const [productSearch, setProductSearch] = useState('');
   const [productPage, setProductPage] = useState(1);
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
-  // Estados: Pedidos
   const [orderSearch, setOrderSearch] = useState('');
   const [orderPage, setOrderPage] = useState(1);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
-  // Estados: Devoluciones
   const [returnsList, setReturnsList] = useState([]);
   const [returnFilter, setReturnFilter] = useState('pending');
   const [returnPage, setReturnPage] = useState(1);
 
-  // Estados: Usuarios
   const [userSearch, setUserSearch] = useState('');
   const [userPage, setUserPage] = useState(1);
   const [userForm, setUserForm] = useState({ nombre: '', apellido: '', correoElectronico: '', telefono: '', contrasenaFriada: '', rolId: 1 });
   const [editingUserId, setEditingUserId] = useState(null);
 
-  // Estados: Factura
   const [showInvoice, setShowInvoice] = useState(false);
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState(null);
 
-  // --- SISTEMA DE NOTIFICACIONES ---
+  // --- AUTO-REFRESCO (POLLING) ---
+  useEffect(() => {
+      const intervalId = setInterval(() => {
+          if (fetchProducts) fetchProducts();
+          if (fetchOrders) fetchOrders();
+          if (activeSection === 'returns') fetchReturns();
+          setLastUpdate(new Date());
+      }, 5000); 
+
+      return () => clearInterval(intervalId); 
+  }, [fetchProducts, fetchOrders, activeSection]);
+
+  const handleManualRefresh = () => {
+      if (fetchProducts) fetchProducts();
+      if (fetchOrders) fetchOrders();
+      if (fetchUsers) fetchUsers();
+      if (activeSection === 'returns') fetchReturns();
+      showToast('Datos actualizados', 'success');
+      setLastUpdate(new Date());
+  };
+  // ---------------------------------
+
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
   const showToast = (message, type = 'success') => {
       setNotification({ show: true, message, type });
       setTimeout(() => setNotification(prev => ({ ...prev, show: false })), 3000);
   };
 
-  // --- LÓGICA DE EXPORTACIÓN (Solo Pedidos, Usuarios, Devoluciones) ---
   const handleExport = (type) => {
       let dataToExport = [];
       let filename = `reporte_${type}_${new Date().toISOString().slice(0,10)}`;
@@ -129,7 +146,6 @@ export const AdminDashboardPage = () => {
       showToast(`Reporte de ${type} exportado exitosamente`, 'success');
   };
 
-  // --- REPORTES VISUALES ---
   const reportData = useMemo(() => {
       if (!orders || !returnsList) return null;
       const totalRevenue = orders.reduce((acc, o) => acc + Number(o.contenidoTotal || 0), 0);
@@ -172,12 +188,13 @@ export const AdminDashboardPage = () => {
     } catch (error) { console.error(error); }
   };
 
-  // HANDLERS
+  // Handlers
   const handleToggleProductStatus = async (product) => {
       if (!updateProduct) return;
       try {
           const newStatus = product.activo === undefined ? false : !product.activo;
           await updateProduct(product.productoId, { activo: newStatus });
+          if (fetchProducts) fetchProducts();
       } catch (error) { showToast("Error al cambiar estado", 'error'); }
   };
   const getStockStatus = (stock) => {
@@ -186,11 +203,15 @@ export const AdminDashboardPage = () => {
       return { label: 'DISPONIBLE', color: 'bg-green-100 text-green-800', border: 'border-green-200' };
   };
   const handleOrderStatusChange = async (orderId, newStatus) => {
-      try { await updateOrderStatus(orderId, Number(newStatus)); showToast("Estado actualizado", 'success'); } 
+      try { 
+          await updateOrderStatus(orderId, Number(newStatus)); 
+          if(fetchOrders) fetchOrders(); 
+          showToast("Estado actualizado", 'success'); 
+      } 
       catch (error) { showToast("Error al actualizar", 'error'); }
   };
   const handleDeleteOrder = async (orderId) => {
-      if(!confirm("¿Eliminar pedido?")) return;
+      if(!confirm("¿Eliminar pedido permanentemente?")) return;
       try {
           await pedidosAPI.delete(orderId);
           if(fetchOrders) await fetchOrders();
@@ -218,21 +239,49 @@ export const AdminDashboardPage = () => {
         showToast("Devolución actualizada", 'success');
     } catch (error) { showToast("Error al procesar", 'error'); }
   };
+
+  // --- CORRECCIÓN AQUÍ: handleUserSubmit ---
   const handleUserSubmit = async (e) => { 
       e.preventDefault();
       try {
+        // 1. Copiamos el formulario
         const payload = { ...userForm };
-        if (!payload.contrasenaFriada) delete payload.contrasenaFriada;
-        if (editingUserId) await updateUser(editingUserId, payload);
-        else await createUser(userForm);
+
+        // 2. ELIMINAMOS PROPIEDADES QUE EL BACKEND NO ACEPTA
+        delete payload.usuarioId;
+        delete payload.fechaCreacion;
+        delete payload.fechaActualizacion;
+        delete payload.rol;      // El objeto rol completo no se debe enviar
+        delete payload.pedidos;  // Relaciones no se envían
+        delete payload.direcciones;
+
+        // 3. Limpieza de contraseña vacía
+        if (!payload.contrasenaFriada) {
+            delete payload.contrasenaFriada;
+        }
+
+        // 4. Enviar datos limpios
+        if (editingUserId) {
+            await updateUser(editingUserId, payload);
+        } else {
+            await createUser(userForm);
+        }
+
         setUserForm({ nombre: '', apellido: '', correoElectronico: '', telefono: '', contrasenaFriada: '', rolId: 1 });
         setEditingUserId(null);
         await fetchUsers();
-        showToast('Usuario guardado', 'success');
-      } catch (err) { showToast(err.message, 'error'); }
+        showToast('Usuario guardado exitosamente', 'success');
+      } catch (err) { 
+          // Manejo de errores más amigable
+          const errorMsg = err.response?.data?.message 
+            ? (Array.isArray(err.response.data.message) ? err.response.data.message.join(', ') : err.response.data.message)
+            : err.message;
+          showToast(errorMsg, 'error'); 
+      }
   };
+  // -----------------------------------------
 
-  // FILTROS
+  // Filtros
   const filteredProducts = (products || []).filter(p => p.nombre.toLowerCase().includes(productSearch.toLowerCase()));
   const paginatedProducts = filteredProducts.slice((productPage - 1) * ITEMS_PER_PAGE, productPage * ITEMS_PER_PAGE);
   const filteredOrders = (orders || []).filter(o => o.pedidoId.toString().includes(orderSearch) || `${o.usuario?.nombre} ${o.usuario?.apellido}`.toLowerCase().includes(orderSearch.toLowerCase())).sort((a,b) => new Date(b.fechaCreacion) - new Date(a.fechaCreacion));
@@ -254,8 +303,19 @@ export const AdminDashboardPage = () => {
           </div>
       )}
 
+      {/* HEADER + BOTÓN REFRESCAR */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 print:hidden">
-          <h1 className='text-3xl font-bold text-gray-800 tracking-tight'>Panel de Administración</h1>
+          <div className="flex items-center gap-4">
+              <h1 className='text-3xl font-bold text-gray-800 tracking-tight'>Panel de Administración</h1>
+              <button 
+                  onClick={handleManualRefresh} 
+                  title="Actualizar datos ahora"
+                  className="p-2 bg-white text-gray-500 rounded-full hover:bg-gray-100 hover:text-cyan-600 transition-all shadow-sm border border-gray-200"
+              >
+                  <HiRefresh className={`w-5 h-5 ${false ? 'animate-spin' : ''}`} />
+              </button>
+          </div>
+          
           <div className="flex bg-white rounded-lg p-1 shadow-sm border border-gray-200 overflow-x-auto">
              {['reports', 'products', 'orders', 'returns', 'users'].map(sec => (
                 <button key={sec} onClick={() => setActiveSection(sec)} className={`px-4 py-2 text-sm font-medium rounded-md transition-all whitespace-nowrap ${activeSection === sec ? 'bg-cyan-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}>
@@ -269,7 +329,7 @@ export const AdminDashboardPage = () => {
       {activeSection === 'reports' && reportData && (
         <div className='animate-fade-in space-y-8'>
             <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <div><h2 className="text-2xl font-bold text-gray-800">Resumen General</h2><p className="text-gray-500 text-sm mt-1">Reportes y métricas de rendimiento</p></div>
+                <div><h2 className="text-2xl font-bold text-gray-800">Resumen General</h2><p className="text-gray-500 text-sm mt-1">Reportes y métricas de rendimiento (Actualizado: {lastUpdate.toLocaleTimeString()})</p></div>
                 <button onClick={() => window.print()} className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-black transition-colors print:hidden"><HiDownload size={20} /> Guardar PDF</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -284,7 +344,7 @@ export const AdminDashboardPage = () => {
         </div>
       )}
 
-      {/* 2. PRODUCTOS (REVERTIDO A ORIGINAL) */}
+      {/* 2. PRODUCTOS */}
       {activeSection === 'products' && (
         <div className="animate-fade-in">
           <div className='flex flex-col sm:flex-row justify-between items-center mb-6 gap-4'>
@@ -292,7 +352,7 @@ export const AdminDashboardPage = () => {
                 <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input type="text" placeholder="Buscar producto..." className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none" value={productSearch} onChange={e => { setProductSearch(e.target.value); setProductPage(1); }} />
             </div>
-            {/* BOTONES LIMPIOS: Solo Nuevo Producto */}
+            {/* BOTONES LIMPIOS */}
             <button onClick={() => { setEditingProduct(null); setShowProductForm(true); }} className='flex items-center gap-2 bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 shadow-sm font-medium'>
                 <HiPlus /> Nuevo Producto
             </button>

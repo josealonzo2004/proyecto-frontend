@@ -9,20 +9,32 @@ export const ProductDetail = () => {
     const navigate = useNavigate();
     
     const { addToCart, getProductQuantityInCart } = useCart();
-    const { products, loading } = useProducts(); 
+    // AGREGADO: 'fetchProducts'
+    const { products, loading, fetchProducts } = useProducts(); 
     
     const [selectedVariant, setSelectedVariant] = useState(null);
     const [quantity, setQuantity] = useState(1);
     const [customizationText, setCustomizationText] = useState('');
     const [customizationFile, setCustomizationFile] = useState(null);
 
-    // --- NOTIFICACIONES MEJORADAS ---
+    // --- AGREGADO: AUTO-REFRESCO ---
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if(fetchProducts) fetchProducts();
+        }, 1000); // 5 seg
+        return () => clearInterval(interval);
+    }, [fetchProducts]);
+    // -----------------------------
+
+    // Estado para notificaciones (Toast)
     const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+
     const showToast = (message, type = 'success') => {
         setNotification({ show: true, message, type });
-        setTimeout(() => setNotification({ show: false, message: '', type: '' }), 3000);
+        setTimeout(() => {
+            setNotification(prev => ({ ...prev, show: false }));
+        }, 3000);
     };
-    // -------------------------------
 
     const product = (products && products.length > 0) 
         ? products.find(p => p.productoId === Number(id)) 
@@ -63,7 +75,7 @@ export const ProductDetail = () => {
         }
     }, [availableToAdd]);
 
-    if (loading) return <div className='text-center py-20 text-xl font-bold text-gray-500'>Cargando producto...</div>;
+    if (loading && !product) return <div className='text-center py-20 text-xl font-bold text-gray-500'>Cargando producto...</div>;
     
     if (!product && !loading) {
         return (
@@ -147,7 +159,7 @@ export const ProductDetail = () => {
     return (
         <div className='max-w-6xl mx-auto px-4 py-8 relative notranslate'>
             
-            {/* --- TOAST NOTIFICATION (Estilo Unificado) --- */}
+            {/* --- TOAST NOTIFICATION --- */}
             {notification.show && (
                 <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-xl flex items-center gap-3 animate-bounce-in transition-all transform duration-300 ${
                     notification.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200'
@@ -268,6 +280,7 @@ export const ProductDetail = () => {
                             }`}
                         >
                             <HiOutlineShoppingCart size={20} /> 
+                            {/* PROTECCIÓN DE TEXTO DINÁMICO */}
                             <span>{isOutOfStock ? 'Sin Stock' : 'Agregar al carrito'}</span>
                         </button>
                         <button 
