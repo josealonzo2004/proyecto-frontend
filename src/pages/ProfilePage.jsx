@@ -1,26 +1,61 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-// CORRECCIÓN AQUÍ: Importamos 'usersAPI' que es como se llama en tu archivo api.js
 import { direccionesAPI, pedidosAPI, devolucionesAPI, usersAPI } from "../services/api"; 
 import { 
     HiPencil, HiTrash, HiX, HiReply, HiExclamationCircle, 
-    HiUpload, HiUser, HiLocationMarker, HiShoppingBag, 
-    HiRefresh, HiCheckCircle, HiChevronLeft, HiChevronRight,
-    HiTruck, HiClock, HiBan, HiLogout, HiDocumentText
+    HiUser, HiLocationMarker, HiShoppingBag, 
+    HiRefresh, HiChevronLeft, HiChevronRight
 } from 'react-icons/hi'; 
 
-// --- COMPONENTE DE PAGINACIÓN ---
+// --- COMPONENTE DE PAGINACIÓN MEJORADO (Smart Pagination) ---
 const Pagination = ({ totalItems, itemsPerPage, currentPage, onPageChange }) => {
     const totalPages = Math.ceil(totalItems / itemsPerPage);
     if (totalPages <= 1) return null;
 
+    // Lógica para generar los números de página con puntos suspensivos
+    const getPageNumbers = () => {
+        const pages = [];
+        if (totalPages <= 7) {
+            // Si son pocas páginas, mostramos todas (ej: 1 2 3 4 5)
+            for (let i = 1; i <= totalPages; i++) pages.push(i);
+        } else {
+            // Si son muchas, mostramos lógica acortada
+            if (currentPage <= 4) {
+                // Al principio: 1 2 3 4 5 ... 19
+                pages.push(1, 2, 3, 4, 5, '...', totalPages);
+            } else if (currentPage >= totalPages - 3) {
+                // Al final: 1 ... 15 16 17 18 19
+                pages.push(1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+            } else {
+                // En el medio: 1 ... 9 10 11 ... 19
+                pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+            }
+        }
+        return pages;
+    };
+
     return (
         <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4 rounded-b-lg">
+            {/* Vista Móvil: Solo botones Anterior/Siguiente */}
             <div className="flex flex-1 justify-between sm:hidden">
-                <button onClick={() => onPageChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">Anterior</button>
-                <button onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">Siguiente</button>
+                <button 
+                    onClick={() => onPageChange(Math.max(1, currentPage - 1))} 
+                    disabled={currentPage === 1} 
+                    className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                    Anterior
+                </button>
+                <button 
+                    onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))} 
+                    disabled={currentPage === totalPages} 
+                    className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                    Siguiente
+                </button>
             </div>
+
+            {/* Vista Escritorio: Números inteligentes */}
             <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                 <div>
                     <p className="text-sm text-gray-700">
@@ -29,17 +64,44 @@ const Pagination = ({ totalItems, itemsPerPage, currentPage, onPageChange }) => 
                 </div>
                 <div>
                     <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                        <button onClick={() => onPageChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 disabled:opacity-50"><HiChevronLeft className="h-5 w-5" /></button>
-                        {[...Array(totalPages)].map((_, i) => (
-                             <button 
-                                key={i + 1}
-                                onClick={() => onPageChange(i + 1)}
-                                className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${currentPage === i + 1 ? 'z-10 bg-cyan-600 text-white focus:outline-none' : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'}`}
-                             >
-                                {i + 1}
-                             </button>
+                        {/* Botón Anterior */}
+                        <button 
+                            onClick={() => onPageChange(Math.max(1, currentPage - 1))} 
+                            disabled={currentPage === 1} 
+                            className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 disabled:opacity-50"
+                        >
+                            <HiChevronLeft className="h-5 w-5" />
+                        </button>
+                        
+                        {/* Números de Página */}
+                        {getPageNumbers().map((page, index) => (
+                             page === '...' ? (
+                                <span key={`dots-${index}`} className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 ring-1 ring-inset ring-gray-300 focus:outline-offset-0">
+                                    ...
+                                </span>
+                             ) : (
+                                <button 
+                                    key={page}
+                                    onClick={() => onPageChange(page)}
+                                    className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20 focus:outline-offset-0 ${
+                                        currentPage === page 
+                                        ? 'z-10 bg-cyan-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600' 
+                                        : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    {page}
+                                </button>
+                             )
                         ))}
-                        <button onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 disabled:opacity-50"><HiChevronRight className="h-5 w-5" /></button>
+
+                        {/* Botón Siguiente */}
+                        <button 
+                            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))} 
+                            disabled={currentPage === totalPages} 
+                            className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 disabled:opacity-50"
+                        >
+                            <HiChevronRight className="h-5 w-5" />
+                        </button>
                     </nav>
                 </div>
             </div>
@@ -62,7 +124,7 @@ export const ProfilePage = () => {
     const [profileForm, setProfileForm] = useState({ nombre: '', apellido: '', telefono: '' });
 
     // Paginación
-    const ITEMS_PER_PAGE = 2; 
+    const ITEMS_PER_PAGE = 2; // Puedes subir esto a 5 o 10 si prefieres
     const [addressPage, setAddressPage] = useState(1);
     const [orderPage, setOrderPage] = useState(1);
     const [returnPage, setReturnPage] = useState(1);
@@ -88,7 +150,11 @@ export const ProfilePage = () => {
 
     useEffect(() => {
         if (activeTab === 'addresses') {
-            direccionesAPI.getAll().then((res) => setMisDirecciones(res.data)).catch(console.error);
+            direccionesAPI.getAll().then((res) => {
+                // --- CORRECCIÓN AQUÍ: Ordenar direcciones (Nuevas primero) ---
+                const sortedAddresses = res.data.sort((a, b) => b.direccionId - a.direccionId);
+                setMisDirecciones(sortedAddresses);
+            }).catch(console.error);
         }
         if (activeTab === 'orders' && user) {
             pedidosAPI.getAll().then((res) => {
@@ -126,12 +192,10 @@ export const ProfilePage = () => {
     const handleProfileUpdate = async (e) => {
         e.preventDefault();
         try {
-            // CORRECCIÓN: Usamos usersAPI en lugar de usuariosAPI
             if (usersAPI && usersAPI.update) {
                 await usersAPI.update(user.usuarioId, profileForm);
                 alert("¡Datos actualizados correctamente!");
             } else {
-                console.error("usersAPI no está definido correctamente");
                 alert("Error técnico: API no configurada.");
             }
         } catch (error) {
@@ -150,11 +214,17 @@ export const ProfilePage = () => {
         setEditingAddress(dir.direccionId);
         setFormData({ callePrincipal: dir.callePrincipal, avenida: dir.avenida||'', ciudad: dir.ciudad, provincia: dir.provincia, pais: dir.pais });
     };
+    const cancelEdit = () => {
+        setEditingAddress(null);
+        setFormData({});
+    };
     const handleUpdateAddress = async (e) => {
         e.preventDefault();
         await direccionesAPI.update(editingAddress, { usuarioId: user.usuarioId, ...formData });
         const updated = misDirecciones.map(d => d.direccionId === editingAddress ? { ...d, ...formData } : d);
-        setMisDirecciones(updated);
+        
+        // Reordenar también después de editar para mantener el orden correcto
+        setMisDirecciones(updated.sort((a, b) => b.direccionId - a.direccionId));
         setEditingAddress(null);
     };
 
@@ -230,7 +300,6 @@ export const ProfilePage = () => {
                                     {tab.label}
                                 </button>
                             ))}
-
                         </nav>
                     </div>
 
@@ -360,7 +429,7 @@ export const ProfilePage = () => {
                             <div className="mb-4 bg-blue-50 p-3 rounded-lg text-sm text-blue-800 border border-blue-100"><strong>Producto:</strong> {returnItemData.variante?.producto?.nombre}</div>
                             <div className="mb-4"><label className="block text-sm font-bold mb-2">Motivo</label><select className="w-full border rounded-lg px-3 py-2" value={returnForm.causa} onChange={(e) => setReturnForm({...returnForm, causa: e.target.value})} required><option value="">Selecciona...</option><option value="Defectuoso">Defectuoso</option><option value="Arrepentimiento">Arrepentimiento</option></select></div>
                             <div className="mb-4"><label className="block text-sm font-bold mb-2">Detalles</label><textarea className="w-full border rounded-lg px-3 py-2 h-24 resize-none" value={returnForm.comentario} onChange={(e) => setReturnForm({...returnForm, comentario: e.target.value})} required></textarea></div>
-                            <div className="mb-6"><label className="block text-sm font-bold mb-2">Evidencia</label><input type="file" className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100" onChange={handleFileChange}/></div>
+                            <div className="mb-6"><label className="block text-sm font-bold mb-2">Evidenciar Factura</label><input type="file" className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100" onChange={handleFileChange}/></div>
                             <div className="flex gap-3"><button type="button" onClick={closeReturnModal} className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button><button type="submit" className="flex-1 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-bold">Enviar</button></div>
                         </form>
                     </div>

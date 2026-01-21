@@ -18,15 +18,12 @@ export const ProductsPage = () => {
 
     useEffect(() => {
         let filtered = products || [];
-
-        // Filtro por búsqueda
         if (searchTerm) {
             filtered = filtered.filter(p =>
                 p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 p.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
             );
         }
-
         setFilteredProducts(filtered);
     }, [searchTerm, products]);
 
@@ -47,7 +44,6 @@ export const ProductsPage = () => {
             </div>
 
             {/* Grid de productos */}
-            {/* CAMBIO: Usamos 'grid-cols-2' en móvil y 'lg:grid-cols-4' en PC */}
             <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4'>
                 {filteredProducts.map(product => {
                     return (
@@ -55,27 +51,31 @@ export const ProductsPage = () => {
                             key={product.productoId} 
                             product={product}
                             onAddToCart={() => {
-                                // 1. Definir qué variante agregar (la primera o una estándar)
                                 let variantToAdd;
                                 
-                                if (product.variantes && product.variantes.length > 0) {
-                                    // Si tiene variantes, tomamos la primera por defecto
-                                    variantToAdd = product.variantes[0];
+                                // --- CORRECCIÓN ROBUSTA ---
+                                // Filtramos variantes ignorando mayúsculas y espacios
+                                const validVariants = product.variantes?.filter(v => 
+                                    v.nombre.trim().toLowerCase() !== 'prueba'
+                                ) || [];
+                                
+                                if (validVariants.length > 0) {
+                                    // Si queda alguna variante válida, usamos la primera
+                                    variantToAdd = {
+                                        ...validVariants[0],
+                                        precio: Number(validVariants[0].precio)
+                                    };
                                 } else {
-                                    // Si no tiene, creamos una variante "dummy" con los datos del producto
+                                    // Si no hay variantes o solo estaba "Prueba", usamos el producto base ($20)
                                     variantToAdd = {
                                         nombre: 'Estándar',
-                                        precio: product.precio,
+                                        precio: Number(product.precio), // Precio Correcto
                                         productoId: product.productoId,
-                                        varianteId: null // Opcional, dependiendo de tu backend
+                                        varianteId: null 
                                     };
                                 }
 
-                                // 2. Llamar a la función real del contexto
-                                // addToCart(producto, variante, personalizacion)
                                 addToCart(product, variantToAdd, null); 
-
-                                // 3. Avisar al usuario
                                 alert("¡Producto agregado al carrito correctamente!");
                             }}
                         />

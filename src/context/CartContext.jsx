@@ -13,13 +13,23 @@ export const useCart = () => {
 export const CartProvider = ({ children }) => {
     const [cartItems, setCartItems] = useState([]);
 
+    // Cargar carrito y convertir precios a números por seguridad
     useEffect(() => {
         try {
             const savedCart = localStorage.getItem('cart');
             if (savedCart) {
                 const parsed = JSON.parse(savedCart);
                 if (Array.isArray(parsed)) {
-                    setCartItems(parsed);
+                    // Limpieza de datos al cargar
+                    const cleanCart = parsed.map(item => ({
+                        ...item,
+                        quantity: Number(item.quantity),
+                        variant: {
+                            ...item.variant,
+                            precio: Number(item.variant?.precio || 0)
+                        }
+                    }));
+                    setCartItems(cleanCart);
                 }
             }
         } catch (error) {
@@ -40,37 +50,43 @@ export const CartProvider = ({ children }) => {
         const cartItem = {
             id: Date.now(),
             product,
-            variant,
+            variant: {
+                ...variant,
+                precio: Number(variant?.precio || 0) // Forzar número
+            },
             customization,
             quantity: 1
         };
-        setCartItems([...cartItems, cartItem]);
+        setCartItems(prev => [...prev, cartItem]);
     };
 
     const removeFromCart = (itemId) => {
-        setCartItems(cartItems.filter(item => item.id !== itemId));
+        setCartItems(prev => prev.filter(item => item.id !== itemId));
     };
 
     const updateQuantity = (itemId, quantity) => {
-        setCartItems(cartItems.map(item => 
-            item.id === itemId ? { ...item, quantity } : item
+        const qty = Number(quantity);
+        if (qty < 1) return;
+        setCartItems(prev => prev.map(item => 
+            item.id === itemId ? { ...item, quantity: qty } : item
         ));
     };
 
     const clearCart = () => {
         setCartItems([]);
+        localStorage.removeItem('cart');
     };
 
     const getTotal = () => {
         return cartItems.reduce((sum, item) => {
-            const precio = item.variant?.precio || 0;
-            const cantidad = item.quantity || 1;
+            const precio = Number(item.variant?.precio || 0);
+            const cantidad = Number(item.quantity || 1);
             return sum + (precio * cantidad);
         }, 0);
     };
 
     const getTotalItems = () => {
-        return cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+        return cartItems.reduce((sum, item) => sum + Number(item.quantity || 1), 0);
     };
 
     const value = {
